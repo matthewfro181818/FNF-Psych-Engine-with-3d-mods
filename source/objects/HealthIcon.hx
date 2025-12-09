@@ -6,98 +6,69 @@ import flixel.tweens.FlxEase;
 import flixel.tweens.FlxTween;
 import flixel.FlxSprite;
 import openfl.utils.Assets as OpenFlAssets;
-import backend.Paths;
+
+using StringTools;
 
 class HealthIcon extends FlxSprite
 {
 	public var sprTracker:FlxSprite;
+	private var isOldIcon:Bool = false;
+	private var isPlayer:Bool = false;
 
-	public var defaultIconScale:Float = 1.0;
+	public var defualtIconScale:Float = 1.0;
 	public var iconScale:Float = 1.0;
 	public var iconSize:Float = 128;
 
-	var char:String = "face";
+	var char:String;
 	public var status:String = "normal";
 
 	private var tween:FlxTween;
 
-	private var iconOffsets:Array<Float> = [0, 0];
+	private static final pixelIcons:Array<String> = ["bf-pixel", "senpai", "senpai-angry", "spirit"];
 
-	// Pixel characters use no antialiasing
-	private static final pixelIcons:Array<String> =
-		["bf-pixel", "senpai", "senpai-angry", "spirit"];
-
-	public function new(char:String = "face", isPlayer:Bool = false, ?_id:Int = -1)
+	public function new(char:String = 'face', isPlayer:Bool = false, ?_id:Int = -1)
 	{
 		super();
 		flipX = isPlayer;
 
 		changeChar(char);
-		loadStatus("normal");
 
-		antialiasing = !pixelIcons.contains(this.char);
+		normal();
+
+		antialiasing = !pixelIcons.contains(char);
 		scrollFactor.set();
 
 		tween = FlxTween.tween(this, {}, 0);
 	}
 
-
-	// --------------------------------------------------------------
-	// CHAR SELECTION + MOD-FOLDER COMPATIBILITY
-	// --------------------------------------------------------------
-
 	public function changeChar(char:String)
 	{
-		// Character icons live in mods/<mod>/images/healthicons/<char>/
-		var folder = "images/healthicons/" + char;
-
-		var modPath = Paths.mods(folder + "/normal.png");
-		var sharedPath = Paths.getSharedPath(folder + "/normal.png");
-
-		if (FileSystem.exists(modPath) || OpenFlAssets.exists(sharedPath))
+		if (FileSystem.exists("assets/images/healthicons/" + char))
 			this.char = char;
 		else
 			this.char = "face";
-	}
-
-
-	public function changeIcon(char:String, ?allowGPU:Bool = true) {
-		// Character icons live in mods/<mod>/images/healthicons/<char>/
-		var folder = "images/healthicons/" + char;
-
-		var modPath = Paths.mods(folder + "/normal.png");
-		var sharedPath = Paths.getSharedPath(folder + "/normal.png");
-
-		if (FileSystem.exists(modPath) || OpenFlAssets.exists(sharedPath))
-			this.char = char;
-		else
-			this.char = "face";
-	}
-
-	// --------------------------------------------------------------
-	// ICON STATES
-	// --------------------------------------------------------------
-
-	public function loadStatus(state:String)
-	{
-		var path = "healthicons/" + char + "/" + state;
-		loadGraphic(Paths.image(path));
-		status = state;
 	}
 
 	public function normal()
-		loadStatus("normal");
+	{
+		if (FileSystem.exists("assets/shared/images/healthicons/" + char + "/normal.png"))
+			loadGraphic(Paths.image("healthicons/" + char + "/normal"));
+		status = "normal";
+	}
 
 	public function win()
-		loadStatus("win");
+	{
+		if (FileSystem.exists("assets/shared/images/healthicons/" + char + "/win.png"))
+			loadGraphic(Paths.image("healthicons/" + char + "/win"));
+		status = "win";
+	}
 
 	public function lose()
-		loadStatus("lose");
-
-
-	// --------------------------------------------------------------
-	// UPDATE + SCALING
-	// --------------------------------------------------------------
+	{
+		if (FileSystem.exists("assets/shared/images/healthicons/" + char + "/lose.png"))
+			loadGraphic(Paths.image("healthicons/" + char + "/lose"));
+		status = "lose";
+	}
 
 	override function update(elapsed:Float)
 	{
@@ -106,35 +77,42 @@ class HealthIcon extends FlxSprite
 		updateHitbox();
 	}
 
-	public function tweenToDefaultScale(time:Float, ease:Null<flixel.tweens.EaseFunction>)
+
+	public function swapOldIcon() {
+		if(isOldIcon = !isOldIcon) changeIcon('bf-old');
+		else changeIcon('bf');
+	}
+
+	private var iconOffsets:Array<Float> = [0, 0];
+	public function changeIcon(char:String) {
+		if (FileSystem.exists("assets/shared/images/healthicons/" + char))
+			this.char = char;
+		else
+			this.char = "face";
+	}
+
+	public function tweenToDefaultScale(_time:Float, _ease:Null<flixel.tweens.EaseFunction>)
 	{
 		tween.cancel();
-		tween = FlxTween.tween(this, {iconScale: this.defaultIconScale}, time, {ease: ease});
+		tween = FlxTween.tween(this, {iconScale: this.defualtIconScale}, _time, {ease: _ease});
 	}
 
 
-	// --------------------------------------------------------------
-	// CLEANUP
-	// --------------------------------------------------------------
+	public var autoAdjustOffset:Bool = true;
+	public function getCharacter():String {
+		return char;
+	}
+
+	override function updateHitbox()
+	{
+		super.updateHitbox();
+		offset.x = iconOffsets[0];
+		offset.y = iconOffsets[1];
+	}
 
 	override public function destroy()
 	{
 		tween = FlxDestroyUtil.destroy(tween);
 		super.destroy();
-	}
-
-	public var autoAdjustOffset:Bool = true;
-	override function updateHitbox()
-	{
-		super.updateHitbox();
-		if(autoAdjustOffset)
-		{
-			offset.x = iconOffsets[0];
-			offset.y = iconOffsets[1];
-		}
-	}
-
-	public function getCharacter():String {
-		return char;
 	}
 }
