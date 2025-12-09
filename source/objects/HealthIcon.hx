@@ -10,6 +10,8 @@ import Paths;
 
 class HealthIcon extends FlxSprite
 {
+	public var sprTracker:FlxSprite;
+
 	public var defaultIconScale:Float = 1.0;
 	public var iconScale:Float = 1.0;
 	public var iconSize:Float = 128;
@@ -18,6 +20,8 @@ class HealthIcon extends FlxSprite
 	public var status:String = "normal";
 
 	private var tween:FlxTween;
+
+	private var iconOffsets:Array<Float> = [0, 0];
 
 	// Pixel characters use no antialiasing
 	private static final pixelIcons:Array<String> =
