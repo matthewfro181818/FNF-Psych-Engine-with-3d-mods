@@ -575,4 +575,98 @@ class Note extends FlxSprite
 
 		return rect;
 	}
+
+// ======================================================
+// TNT COLORZ PALETTE SUPPORT - FULL PSYCH 1.0.4 PORT
+// ======================================================
+public static var colorzShaders:Array<Colorz> = [];
+public static var colorz:Array<FlxColor> = [];
+
+public static function loadColorz(?palette1:String, ?palette2:String)
+{
+    clearColorz();
+
+    if (palette1 == null) palette1 = "default";
+    if (palette2 == null) palette2 = palette1;
+
+    for (pal in [palette1, palette2])
+    {
+        var filePath = Paths.json('_notecolors/' + pal.toLowerCase());
+        var raw:String;
+
+        if (sys.FileSystem.exists(filePath))
+            raw = sys.io.File.getContent(filePath);
+        else
+            raw = sys.io.File.getContent(Paths.json('_notecolors/default'));
+
+        var json:ColorzJSON = haxe.Json.parse(raw);
+
+        colorzShaders.push(new Colorz(
+            Std.parseInt("0x" + json.left.inner),
+            Std.parseInt("0x" + json.left.outer),
+            Std.parseInt("0x" + json.left.base)
+        ));
+        colorzShaders.push(new Colorz(
+            Std.parseInt("0x" + json.down.inner),
+            Std.parseInt("0x" + json.down.outer),
+            Std.parseInt("0x" + json.down.base)
+        ));
+        colorzShaders.push(new Colorz(
+            Std.parseInt("0x" + json.up.inner),
+            Std.parseInt("0x" + json.up.outer),
+            Std.parseInt("0x" + json.up.base)
+        ));
+        colorzShaders.push(new Colorz(
+            Std.parseInt("0x" + json.right.inner),
+            Std.parseInt("0x" + json.right.outer),
+            Std.parseInt("0x" + json.right.base)
+        ));
+
+        colorz.push(Std.parseInt("0x" + json.left.inner));
+        colorz.push(Std.parseInt("0x" + json.down.inner));
+        colorz.push(Std.parseInt("0x" + json.up.inner));
+        colorz.push(Std.parseInt("0x" + json.right.inner));
+    }
+}
+
+public static function clearColorz()
+{
+    colorzShaders.resize(0);
+    colorz.resize(0);
+}
+
+typedef ColorzJSON = {
+    var left:ColorzPalette;
+    var down:ColorzPalette;
+    var up:ColorzPalette;
+    var right:ColorzPalette;
+}
+
+typedef ColorzPalette = {
+    var inner:String;
+    var outer:String;
+    var base:String;
+}
+
+class Colorz extends FlxShader
+{
+    public var inner:FlxColor;
+    public var outer:FlxColor;
+    public var base:FlxColor;
+
+    public function new(inner:Int, outer:Int, base:Int)
+    {
+        super();
+        this.inner = inner;
+        this.outer = outer;
+        this.base = base;
+
+        try {
+            this.data.innerColor.value = [inner];
+            this.data.outerColor.value = [outer];
+            this.data.baseColor.value = [base];
+        } catch(e) {}
+    }
+}
+
 }

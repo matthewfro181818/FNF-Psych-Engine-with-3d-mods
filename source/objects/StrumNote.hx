@@ -161,6 +161,11 @@ class StrumNote extends FlxSprite
 
 	public function playAnim(anim:String, ?force:Bool = false) {
 		animation.play(anim, force);
+
+        // TNT fallback colorz
+        if(objects.Note.colorz.length > noteData)
+            this.color = objects.Note.colorz[noteData];
+
 		if(animation.curAnim != null)
 		{
 			centerOffsets();

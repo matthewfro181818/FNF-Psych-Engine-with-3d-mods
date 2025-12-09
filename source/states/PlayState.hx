@@ -514,6 +514,9 @@ class PlayState extends MusicBeatState
 
 		if (prevCamFollow != null)
 		{
+        // Load TNT Note Palettes
+        objects.Note.loadColorz(PlayState.SONG.palette1, PlayState.SONG.palette2);
+
 			camFollow = prevCamFollow;
 			prevCamFollow = null;
 		}
@@ -1273,6 +1276,9 @@ class PlayState extends MusicBeatState
 
 	private function generateSong():Void
 	{
+        // Load TNT Note Palettes
+        objects.Note.loadColorz(PlayState.SONG.palette1, PlayState.SONG.palette2);
+
 		// FlxG.log.add(ChartParser.parse());
 		songSpeed = PlayState.SONG.speed;
 		songSpeedType = ClientPrefs.getGameplaySetting('scrolltype');
