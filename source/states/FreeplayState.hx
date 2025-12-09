@@ -50,137 +50,37 @@ class FreeplayState extends MusicBeatState {
 	var player:MusicPlayer;
 
 	override function create() {
-		// Paths.clearStoredMemory();
-		// Paths.clearUnusedMemory();
+		upTri = new FlxSprite().loadGraphic(Paths.getImagePNG('freeplay/triangle'));
+		upTri.flipY = true;
+		upTri.antialiasing = true;
+		upTri.y = iconP1.y - upTri.height - 15;
+		add(upTri);
+		downTri = new FlxSprite().loadGraphic(Paths.getImagePNG('freeplay/triangle'));
+		downTri.antialiasing = true;
+		downTri.y = iconP1.y + iconP1.height + 15;
+		add(downTri);
 
-		persistentUpdate = true;
-		PlayState.isStoryMode = false;
-		WeekData.reloadWeekFiles(false);
+		// scoreText = new FlxTextThing(FlxG.width * 0.7, 5, 0, "", 32);
+		scoreText = new FontAtlasThing(Paths.getSparrowAtlasFunk("fnt/font2"), FlxG.camera, false, FlxG.width * 0.7, 5);
+		// scoreText.autoSize = false;
+		// scoreText.setFormat(Paths.font("vcr"), 32, FlxColor.WHITE, RIGHT);
+		// scoreText.alignment = RIGHT;
 
-		#if DISCORD_ALLOWED
-		// Updating Discord Rich Presence
-		DiscordClient.changePresence("In the Menus", null);
-		#end
-
-		if (WeekData.weeksList.length < 1) {
-			FlxTransitionableState.skipNextTransIn = true;
-			persistentUpdate = false;
-			MusicBeatState.switchState(new states.ErrorState("NO WEEKS ADDED FOR FREEPLAY\n\nPress ACCEPT to go to the Week Editor Menu.\nPress BACK to return to Main Menu.",
-				function() MusicBeatState.switchState(new states.editors.WeekEditorState()),
-				function() MusicBeatState.switchState(new states.MainMenuState())));
-			return;
-		}
-
-		for (i in 0...WeekData.weeksList.length) {
-			if (weekIsLocked(WeekData.weeksList[i]))
-				continue;
-
-			var leWeek:WeekData = WeekData.weeksLoaded.get(WeekData.weeksList[i]);
-			var leSongs:Array<String> = [];
-			var leChars:Array<String> = [];
-
-			for (j in 0...leWeek.songs.length) {
-				leSongs.push(leWeek.songs[j][0]);
-				leChars.push(leWeek.songs[j][1]);
-			}
-
-			WeekData.setDirectoryFromWeek(leWeek);
-			for (song in leWeek.songs) {
-				var colors:Array<Int> = song[2];
-				if (colors == null || colors.length < 3) {
-					colors = [146, 113, 253];
-				}
-				addSong(song[0], i, song[1], FlxColor.fromRGB(colors[0], colors[1], colors[2]));
-			}
-		}
-		Mods.loadTopMod();
-
-		bg = new FlxSprite().loadGraphic(Paths.image('menuDesat'));
-		bg.antialiasing = ClientPrefs.data.antialiasing;
-		add(bg);
-		bg.screenCenter();
-
-		grpSongs = new FlxTypedGroup<Alphabet>();
-		add(grpSongs);
-
-		for (i in 0...songs.length) {
-			var songText:Alphabet = new Alphabet(90, 320, songs[i].songName, true);
-			songText.targetY = i;
-			grpSongs.add(songText);
-
-			songText.scaleX = Math.min(1, 980 / songText.width);
-			songText.snapToPosition();
-
-			Mods.currentModDirectory = songs[i].folder;
-			var icon:HealthIcon = new HealthIcon(songs[i].songCharacter);
-			icon.sprTracker = songText;
-
-			// too laggy with a lot of songs, so i had to recode the logic for it
-			songText.visible = songText.active = songText.isMenuItem = false;
-			icon.visible = icon.active = false;
-
-			// using a FlxGroup is too much fuss!
-			iconArray.push(icon);
-			add(icon);
-
-			// songText.x += 40;
-			// DONT PUT X IN THE FIRST PARAMETER OF new ALPHABET() !!
-			// songText.screenCenter(X);
-		}
-		WeekData.setDirectoryFromWeek();
-
-		scoreText = new FlxText(FlxG.width * 0.7, 5, 0, "", 32);
-		scoreText.setFormat(Paths.font("vcr.ttf"), 32, FlxColor.WHITE, RIGHT);
-
-		scoreBG = new FlxSprite(scoreText.x - 6, 0).makeGraphic(1, 66, 0xFF000000);
+		scoreBG.setGraphicSize(Std.int(FlxG.width * 0.35), 66);
+		scoreBG.updateHitbox();
 		scoreBG.alpha = 0.6;
 		add(scoreBG);
 
-		diffText = new FlxText(scoreText.x, scoreText.y + 36, 0, "", 24);
-		diffText.font = scoreText.font;
-		add(diffText);
-
 		add(scoreText);
 
-		missingTextBG = new FlxSprite().makeGraphic(FlxG.width, FlxG.height, FlxColor.BLACK);
-		missingTextBG.alpha = 0.6;
-		missingTextBG.visible = false;
-		add(missingTextBG);
-
-		missingText = new FlxText(50, 0, FlxG.width - 100, '', 24);
-		missingText.setFormat(Paths.font("vcr.ttf"), 24, FlxColor.WHITE, CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
-		missingText.scrollFactor.set();
-		missingText.visible = false;
-		add(missingText);
-
-		if (curSelected >= songs.length)
-			curSelected = 0;
-		bg.color = songs[curSelected].color;
-		intendedColor = bg.color;
-		lerpSelected = curSelected;
-
-		curDifficulty = Math.round(Math.max(0, Difficulty.defaultList.indexOf(lastDifficultyName)));
-
-		bottomBG = new FlxSprite(0, FlxG.height - 26).makeGraphic(FlxG.width, 26, 0xFF000000);
-		bottomBG.alpha = 0.6;
-		add(bottomBG);
-
-		var leText:String = Language.getPhrase("freeplay_tip",
-			"Press SPACE to listen to the Song / Press CTRL to open the Gameplay Changers Menu / Press RESET to Reset your Score and Accuracy.");
-		bottomString = leText;
-		var size:Int = 16;
-		bottomText = new FlxText(bottomBG.x, bottomBG.y + 4, FlxG.width, leText, size);
-		bottomText.setFormat(Paths.font("vcr.ttf"), size, FlxColor.WHITE, CENTER);
-		bottomText.scrollFactor.set();
-		add(bottomText);
-
-		player = new MusicPlayer(this);
-		add(player);
-
 		changeSelection();
-		updateTexts();
+		changeSetting(startingSelected);
+
+		if (useIconIn)
+			customTransIn = new IconIn(0.5, PlayState.transIcon, PlayState.transColor, "png");
+
 		super.create();
-	}
+    }
 
 	override function closeSubState() {
 		changeSelection(0, false);
@@ -589,40 +489,6 @@ class FreeplayState extends MusicBeatState {
 	var eligibleChars:Array<String> = [];
 
 	var musicStream:AudioStreamThing;
-
-
-
-		upTri = new FlxSprite().loadGraphic(Paths.getImagePNG('freeplay/triangle'));
-		upTri.flipY = true;
-		upTri.antialiasing = true;
-		upTri.y = iconP1.y - upTri.height - 15;
-		add(upTri);
-		downTri = new FlxSprite().loadGraphic(Paths.getImagePNG('freeplay/triangle'));
-		downTri.antialiasing = true;
-		downTri.y = iconP1.y + iconP1.height + 15;
-		add(downTri);
-
-		// scoreText = new FlxTextThing(FlxG.width * 0.7, 5, 0, "", 32);
-		scoreText = new FontAtlasThing(Paths.getSparrowAtlasFunk("fnt/font2"), FlxG.camera, false, FlxG.width * 0.7, 5);
-		// scoreText.autoSize = false;
-		// scoreText.setFormat(Paths.font("vcr"), 32, FlxColor.WHITE, RIGHT);
-		// scoreText.alignment = RIGHT;
-
-		scoreBG.setGraphicSize(Std.int(FlxG.width * 0.35), 66);
-		scoreBG.updateHitbox();
-		scoreBG.alpha = 0.6;
-		add(scoreBG);
-
-		add(scoreText);
-
-		changeSelection();
-		changeSetting(startingSelected);
-
-		if (useIconIn)
-			customTransIn = new IconIn(0.5, PlayState.transIcon, PlayState.transColor, "png");
-
-		super.create();
-	}
 
 	function updateSong() {
 		songText.text = songs[curSelected].songName.toUpperCase();
