@@ -143,7 +143,6 @@ class MainMenuState extends MusicBeatState {
 			if (controls.UI_DOWN_P)
 				changeItem(1);
 
-			var allowMouse:Bool = allowMouse;
 			if (allowMouse
 				&& ((FlxG.mouse.deltaScreenX != 0 && FlxG.mouse.deltaScreenY != 0)
 					|| FlxG.mouse.justPressed)) // FlxG.mouse.deltaScreenX/Y checks is more accurate than FlxG.mouse.justMoved
@@ -240,7 +239,6 @@ class MainMenuState extends MusicBeatState {
 				if (ClientPrefs.data.flashing)
 					FlxFlicker.flicker(magenta, 1.1, 0.15, false);
 
-				var item:FlxSprite;
 				var option:String;
 				switch (curColumn) {
 					case CENTER:
@@ -324,7 +322,6 @@ class MainMenuState extends MusicBeatState {
 			item.centerOffsets();
 		}
 
-		var selectedItem:FlxSprite;
 		switch (curColumn) {
 			case CENTER:
 				selectedItem = menuItems.members[curSelected];
@@ -348,20 +345,6 @@ class MainMenuState extends MusicBeatState {
 	// var versionText:FlxText;
 	var keyWarning:FlxTextThing;
 
-	override function create() {
-		// openfl.Lib.current.stage.frameRate = 144;
-		Main.changeFramerate(144);
-
-		PlayState.SONG = null;
-
-		PlayState.transIcon = "default";
-		PlayState.transColor = FlxColor.BLACK;
-
-		FreeplayState.useIconIn = false;
-
-		if (Main.lol == null) {
-			Main.music(Paths.music(TitleScreen.titleMusic), 0.75);
-		}
 
 		persistentUpdate = persistentDraw = true;
 
@@ -376,7 +359,6 @@ class MainMenuState extends MusicBeatState {
 		optionTweens = new Map<FlxSprite, FlxTween>();
 
 		for (i in 0...optionShit.length) {
-			var menuItem = new FlxTypedGroup<FlxSprite>();
 			var menuBar = new FlxSprite(-266, 22 + i * 177);
 			menuBar.loadGraphic(Paths.getImagePNG("mainmenu/item"));
 			var menuText = new FlxTextThing(0, 0, 765, optionShit[i].toUpperCase());
@@ -417,12 +399,7 @@ class MainMenuState extends MusicBeatState {
 		super.create();
 	}
 
-	var selectedSomethin:Bool = false;
 
-	override function update(elapsed:Float) {
-		if (Main.lol != null && Main.lol.volume < 0.8) {
-			Main.lol.volume += 0.5 * FlxG.elapsed;
-		}
 
 		if (!selectedSomethin) {
 			if (controls.UP_P) {
@@ -517,23 +494,6 @@ class MainMenuState extends MusicBeatState {
 	final code:Array<String> = ["UP", "UP", "DOWN", "DOWN", "LEFT", "RIGHT", "LEFT", "RIGHT", "B", "A"];
 	var codeIndex:Int = 0;
 
-	function changeItem(huh:Int = 0) {
-		curSelected += huh;
-
-		if (curSelected >= menuItems.length)
-			curSelected = 0;
-		if (curSelected < 0)
-			curSelected = menuItems.length - 1;
-
-		// menuItems.forEach(function(spr:FlxSprite)
-		// {
-		// 	spr.animation.play('idle');
-
-		// 	if (spr.ID == curSelected)
-		// 	{
-		// 		spr.animation.play('selected');
-		// 		// camFollow.setPosition(spr.getGraphicMidpoint().x, spr.getGraphicMidpoint().y);
-		// 	}
 		// 	spr.updateHitbox();
 		// });
 		for (i in 0...optionShit.length) {
@@ -558,24 +518,9 @@ class MainMenuState extends MusicBeatState {
 		// Cashew.destroyAll();
 	}
 
-	function create() {
-		// openfl.Lib.current.stage.frameRate = 144;
-		Main.changeFramerate(144);
-
-		PlayState.SONG = null;
-
-		PlayState.transIcon = "default";
-		PlayState.transColor = FlxColor.BLACK;
-
-		FreeplayState.useIconIn = false;
-
-		if (Main.lol == null) {
-			Main.music(Paths.music(TitleScreen.titleMusic), 0.75);
-		}
 
 		persistentUpdate = persistentDraw = true;
 
-		var backdrop = new CrappyTile(Paths.getImagePNG('tile'), 50, 50);
 		add(backdrop);
 
 		menuItems = new FlxTypedGroup<FlxTypedGroup<FlxSprite>>();
@@ -586,13 +531,9 @@ class MainMenuState extends MusicBeatState {
 		optionTweens = new Map<FlxSprite, FlxTween>();
 
 		for (i in 0...optionShit.length) {
-			var menuItem = new FlxTypedGroup<FlxSprite>();
-			var menuBar = new FlxSprite(-266, 22 + i * 177);
 			menuBar.loadGraphic(Paths.getImagePNG("mainmenu/item"));
-			var menuText = new FlxTextThing(0, 0, 765, optionShit[i].toUpperCase());
 			menuText.setFormat(Paths.font("bungee"), 72, FlxColor.WHITE, FlxTextAlign.CENTER, FlxTextBorderStyle.OUTLINE, FlxColor.BLACK);
 			menuText.setPosition(menuBar.x + menuBar.width / 2 - menuText.width / 2, menuBar.y + menuBar.height / 2 - menuText.height / 2);
-			var menuIcon = new FlxSprite(menuBar.x + menuBar.width + 70, 0).loadGraphic(Paths.getImagePNG("mainmenu/" + optionShit[i].replace(" ", "")));
 			menuIcon.y = menuBar.y + menuBar.height / 2 - menuIcon.height / 2;
 			menuBar.antialiasing = true;
 			menuText.antialiasing = true;
@@ -627,7 +568,6 @@ class MainMenuState extends MusicBeatState {
 		super.create();
 	}
 
-	var selectedSomethin:Bool = false;
 
 	override // [MERGED FUNCTION] update from TNT
 	// Original Psych function:
@@ -747,10 +687,6 @@ class MainMenuState extends MusicBeatState {
 	//     	final code:Array<String> = ["UP", "UP", "DOWN", "DOWN", "LEFT", "RIGHT", "LEFT", "RIGHT", "B", "A"];
 	//     	var codeIndex:Int = 0;
 	// TNT function body:
-	function update(elapsed:Float) {
-		if (Main.lol != null && Main.lol.volume < 0.8) {
-			Main.lol.volume += 0.5 * FlxG.elapsed;
-		}
 
 		if (!selectedSomethin) {
 			if (controls.UP_P) {
@@ -776,7 +712,6 @@ class MainMenuState extends MusicBeatState {
 				selectedSomethin = true;
 				FlxG.sound.play(Paths.sound('confirmMenu'));
 
-				var daChoice:String = optionShit[curSelected];
 
 				switch (daChoice) {
 					case 'freeplay':
@@ -832,7 +767,6 @@ class MainMenuState extends MusicBeatState {
 			if (FlxG.keys.checkStatus(code[codeIndex], JUST_PRESSED)) {
 				if (codeIndex >= code.length - 1) {
 					PlayState.autoPlay = !PlayState.autoPlay;
-					var snd:String = (PlayState.autoPlay ? "scrollfaster" : "scrollslower");
 					FlxG.sound.play(Paths.sound(snd), 0.5);
 					codeIndex = 0;
 				} else
@@ -843,7 +777,6 @@ class MainMenuState extends MusicBeatState {
 	}
 
 	final code:Array<String> = ["UP", "UP", "DOWN", "DOWN", "LEFT", "RIGHT", "LEFT", "RIGHT", "B", "A"];
-	var codeIndex:Int = 0;
 
 	// [MERGED FUNCTION] changeItem from TNT
 	// Original Psych function:
@@ -891,23 +824,6 @@ class MainMenuState extends MusicBeatState {
 	//
 	//     	override
 	// TNT function body:
-	function changeItem(huh:Int = 0) {
-		curSelected += huh;
-
-		if (curSelected >= menuItems.length)
-			curSelected = 0;
-		if (curSelected < 0)
-			curSelected = menuItems.length - 1;
-
-		// menuItems.forEach(function(spr:FlxSprite)
-		// {
-		// 	spr.animation.play('idle');
-
-		// 	if (spr.ID == curSelected)
-		// 	{
-		// 		spr.animation.play('selected');
-		// 		// camFollow.setPosition(spr.getGraphicMidpoint().x, spr.getGraphicMidpoint().y);
-		// 	}
 		// 	spr.updateHitbox();
 		// });
 		for (i in 0...optionShit.length) {
