@@ -37,6 +37,8 @@ import openfl.utils.ByteArray;
 import openfl.Assets;
 import openfl.Vector;
 
+import objects.Character;
+
 class ModelThing
 {
 	private var modelBytes:ByteArray;

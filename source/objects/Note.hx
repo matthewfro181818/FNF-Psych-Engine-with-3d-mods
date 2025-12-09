@@ -6,6 +6,7 @@ import shaders.RGBPalette;
 import shaders.RGBPalette.RGBShaderReference;
 import objects.StrumNote;
 import flixel.math.FlxRect;
+import flixel.system.FlxAssets.FlxShader;
 
 using StringTools;
 
@@ -609,23 +610,4 @@ typedef ColorzPalette = {
 	var inner:String;
 	var outer:String;
 	var base:String;
-}
-
-class Colorz extends FlxShader {
-	public var inner:FlxColor;
-	public var outer:FlxColor;
-	public var base:FlxColor;
-
-	public function new(inner:Int, outer:Int, base:Int) {
-		super();
-		this.inner = inner;
-		this.outer = outer;
-		this.base = base;
-
-		try {
-			this.data.innerColor.value = [inner];
-			this.data.outerColor.value = [outer];
-			this.data.baseColor.value = [base];
-		} catch (e) {}
-	}
 }
