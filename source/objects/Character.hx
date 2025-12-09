@@ -9,12 +9,10 @@ import flixel.util.FlxDestroyUtil;
 import openfl.utils.AssetType;
 import openfl.utils.Assets;
 import haxe.Json;
-import haxe.macro.Type.AnonStatus;
 import flixel.system.FlxAssets.FlxGraphicAsset;
 import openfl.display.BitmapData;
 import flixel.FlxG;
 import openfl.display3D.Context3DTextureFormat;
-import openfl.Assets;
 import flixel.FlxObject;
 import flixel.FlxSprite;
 import flixel.animation.FlxBaseAnimation;
@@ -49,28 +47,42 @@ typedef AnimArray = {
 	var offsets:Array<Int>;
 }
 
-class Character extends FlxNestedSkewSprite {
-	/**
-	 * In case a character is missing, it will use this on its place
-	**/
-	public static final DEFAULT_CHARACTER:String = 'bf';
+class Character extends FlxNestedSprite
+{
+	// =====================================================================
+	// BASE CONFIG
+	// =====================================================================
+
+	public static final DEFAULT_CHARACTER:String = "bf";
+
+	public var curCharacter:String = "";
+	public var isPlayer:Bool = false;
+
+	// =====================================================================
+	// ANIMATION + STATE
+	// =====================================================================
+
+	public var animation:PsychAnimationController;
 
 	public var holdTimer:Float = 0;
 	public var heyTimer:Float = 0;
 	public var specialAnim:Bool = false;
+
 	public var animationNotes:Array<Dynamic> = [];
 	public var stunned:Bool = false;
-	public var singDuration:Float = 4; // Multiplier of how long a character holds the sing pose
-	public var idleSuffix:String = '';
-	public var danceIdle:Bool = false; // Character use "danceLeft" and "danceRight" instead of "idle"
+
+	public var singDuration:Float = 4;
+	public var idleSuffix:String = "";
+	public var danceIdle:Bool = false;
 	public var skipDance:Bool = false;
 
-	public var healthIcon:String = 'face';
+	public var healthIcon:String = "face";
 	public var animationsArray:Array<AnimArray> = [];
 
 	public var canAutoAnim:Bool = true;
 	public var canAutoIdle:Bool = true;
 
+	public var animOffsets:Map<String, Array<Float>> = [];
 	public var positionArray:Array<Float> = [0, 0];
 	public var cameraPosition:Array<Float> = [0, 0];
 	public var healthColorArray:Array<Int> = [255, 0, 0];
@@ -79,19 +91,25 @@ class Character extends FlxNestedSkewSprite {
 
 	public var initWidth:Float = -1;
 	public var initFrameWidth:Int = -1;
-	public var initHeight:Float;
+	public var initHeight:Float = -1;
 
 	public var camOffsets:Array<Float> = [0, 0];
 	public var posOffsets:Array<Float> = [0, 0];
 
-	// Used on Character Editor
-	public var imageFile:String = '';
+	// =====================================================================
+	// EDITOR DATA
+	// =====================================================================
+
+	public var imageFile:String = "";
 	public var jsonScale:Float = 1;
 	public var noAntialiasing:Bool = false;
 	public var originalFlipX:Bool = false;
 	public var editorIsPlayer:Null<Bool> = null;
 
-	// 3D
+	// =====================================================================
+	// MODEL (3D) SYSTEM
+	// =====================================================================
+
 	public var isModel:Bool = false;
 	public var modelView:ModelView;
 	public var beganLoading:Bool = false;
@@ -99,74 +117,118 @@ class Character extends FlxNestedSkewSprite {
 	public var modelScale:Float = 1;
 	public var model:ModelThing;
 	public var modelType:String = "md2";
+
 	public var initYaw:Float = 0;
 	public var initPitch:Float = 0;
 	public var initRoll:Float = 0;
+
 	public var xOffset:Float = 0;
 	public var yOffset:Float = 0;
 	public var zOffset:Float = 0;
+
 	public var viewX:Float = 750;
 	public var viewY:Float = 750;
+
 	public var ambient:Float = 1;
 	public var specular:Float = 1;
 	public var diffuse:Float = 1;
+
 	public var animSpeed:Map<String, Float> = new Map<String, Float>();
 	public var noLoopList:Array<String> = [];
 	public var isGlass:Bool = false;
 
 	public static var modelMutex:Bool = false;
-
 	public static var modelMutexThing:ModelThing;
 
-	// Atlas
-	var animRedirect:Map<String, String> = [];
+	// =====================================================================
+	// ATLAS / FLXANIMATE SUPPORT
+	// =====================================================================
 
-	public var atlasContainer:AtlasThing;
 	public var atlasActive:Bool = false;
+	public var atlasContainer:AtlasThing;
+	public var animRedirect:Map<String, String> = [];
 
-	public function new(x:Float, y:Float, ?character:String = "bf", ?isPlayer:Bool = false) {
+	#if flxanimate
+	public var atlas:FlxAnimate;
+	public var isAnimateAtlas:Bool = false;
+	#end
+
+	// =====================================================================
+	// DANCE + MISC STATE
+	// =====================================================================
+
+	public var danced:Bool = false;
+	public var danceEveryNumBeats:Int = 2;
+	private var settingCharacterUp:Bool = true;
+
+	// Track name of last played animation
+	var _lastPlayedAnimation:String = "";
+
+	// =====================================================================
+	// CONSTRUCTOR
+	// =====================================================================
+
+	public function new(x:Float, y:Float, ?character:String = "bf", ?isPlayer:Bool = false)
+	{
 		super(x, y);
+
+		this.isPlayer = isPlayer;
+		curCharacter = character;
 
 		animation = new PsychAnimationController(this);
 
-		animOffsets = new Map<String, Array<Dynamic>>();
+		changeCharacter(curCharacter);
+	}
 
+	// =====================================================================
+	// CHANGE CHARACTER
+	// =====================================================================
+
+	public function changeCharacter(character:String):Void
+	{
 		curCharacter = character;
-		this.isPlayer = isPlayer;
-		changeCharacter(character);
+		animationsArray = [];
+		animOffsets = [];
 
-		switch (curCharacter) {
+		skipDance = false;
+		danceIdle = false;
+		specialAnim = false;
+
+		atlasActive = false;
+		#if flxanimate
+		isAnimateAtlas = false;
+		#end
+
+		var characterPath:String = 'characters/$character.json';
+		// -----------------------------------------------------------------
+		// CONTINUATION OF changeCharacter(character:String)
+		// -----------------------------------------------------------------
+		switch (curCharacter)
+		{
+			// -------------------------------------------------------------
 			case 'pico-speaker':
 				skipDance = true;
 				loadMappedAnims();
 				playAnim("shoot1");
-			case 'pico-blazin', 'darnell-blazin':
+
+			// -------------------------------------------------------------
+			case 'pico-blazin' | 'darnell-blazin':
 				skipDance = true;
-		}
-		// var tex:FlxAtlasFrames;
-		antialiasing = true;
-	}
 
-	public function changeCharacter(character:String) {
-		animationsArray = [];
-		animOffsets = [];
-		curCharacter = character;
-		var characterPath:String = 'characters/$character.json';
-
-		switch (curCharacter) {
+			// -------------------------------------------------------------
 			case 'spirit':
 				frames = Paths.getSparrowAtlasFunk('characters/spirit');
-				animation.addByPrefix('idle', "idle spirit", 24, false);
-				animation.addByPrefix('singUP', "up", 24, false);
-				animation.addByPrefix('singRIGHT', "right", 24, false);
-				animation.addByPrefix('singLEFT', "left", 24, false);
-				animation.addByPrefix('singDOWN', "spirit down", 24, false);
+				animation.addByPrefix('idle', 'idle spirit', 24, false);
+				animation.addByPrefix('singUP', 'up', 24, false);
+				animation.addByPrefix('singRIGHT', 'right', 24, false);
+				animation.addByPrefix('singLEFT', 'left', 24, false);
+				animation.addByPrefix('singDOWN', 'spirit down', 24, false);
 
 				addOffset('idle', 0, 0);
 				addOffset('singUP', -3, 20);
-				addOffset("singRIGHT", -10, 0);
-				addOffset("singLEFT", 10, 0);
-				addOffset("singDOWN", 0, -10);
+				addOffset('singRIGHT', -10, 0);
+				addOffset('singLEFT', 10, 0);
+				addOffset('singDOWN', 0, -10);
 
 				antialiasing = false;
 
@@ -176,37 +238,38 @@ class Character extends FlxNestedSkewSprite {
 
 				try {
 					#if MODS_ALLOWED
-					loadCharacterFile(Json.parse(File.getContent(path)));
+					loadCharacterFile(Json.parse(sys.io.File.getContent(characterPath)));
 					#else
-					loadCharacterFile(Json.parse(Assets.getText(path)));
+					loadCharacterFile(Json.parse(Assets.getText(characterPath)));
 					#end
 				} catch (e:Dynamic) {
-					trace('Error loading character file of "$character": $e');
+					trace('Error loading character file "$character": $e');
 				}
+
+			// -------------------------------------------------------------
 			case 'tankman':
 				createAtlas();
 				setAtlasAnim('idle', "idle");
-				setAtlasAnim('singUP', 'singUP');
-				setAtlasAnim('singUP-alt', 'singRIGHT-alt');
-				setAtlasAnim('singDOWN', 'singDOWN');
-				setAtlasAnim('singLEFT', 'singLEFT');
-				setAtlasAnim('singRIGHT', 'singRIGHT');
-				setAtlasAnim('singRIGHTmiss', 'singRIGHTmiss');
-				setAtlasAnim('singLEFTmiss', 'singLEFTmiss');
-				setAtlasAnim('singUPmiss', 'singUPmiss');
-				setAtlasAnim('singDOWNmiss', 'singDOWNmiss');
-				loadAtlas(Paths.getImageFunk("characters/tankman/spritemap1"), Paths.json("characters/tankman/spritemap1", "images"),
-					Paths.json("characters/tankman/Animation", "images"));
+				setAtlasAnim('singUP', "singUP");
+				setAtlasAnim('singUP-alt', "singRIGHT-alt");
+				setAtlasAnim('singDOWN', "singDOWN");
+				setAtlasAnim('singLEFT', "singLEFT");
+				setAtlasAnim('singRIGHT', "singRIGHT");
+				setAtlasAnim('singRIGHTmiss', "singRIGHTmiss");
+				setAtlasAnim('singLEFTmiss', "singLEFTmiss");
+				setAtlasAnim('singUPmiss', "singUPmiss");
+				setAtlasAnim('singDOWNmiss', "singDOWNmiss");
 
-				skipDance = false;
-				hasMissAnimations = hasAnimation('singLEFTmiss') || hasAnimation('singDOWNmiss') || hasAnimation('singUPmiss') || hasAnimation('singRIGHTmiss');
-				recalculateDanceIdle();
+				loadAtlas(
+					Paths.getImageFunk("characters/tankman/spritemap1"),
+					Paths.json("characters/tankman/spritemap1","images"),
+					Paths.json("characters/tankman/Animation","images")
+				);
 
 				addOffset('idle');
 				addOffset("singUP", 17, 58);
 				addOffset("singLEFT", 86, -29);
 				addOffset("singRIGHT", -21, 4);
-				addOffset("singUP-alt", -4, -6);
 				addOffset("singDOWN", 56, -103);
 				addOffset("singUPmiss", 17, 56);
 				addOffset("singLEFTmiss", 90, -29);
@@ -216,35 +279,32 @@ class Character extends FlxNestedSkewSprite {
 				playAnim('idle');
 				initFacing = FlxObject.LEFT;
 
+			// -------------------------------------------------------------
 			case 'atlanta':
 				frames = Paths.getSparrowAtlasFunk("characters/atlanta");
-				animation.addByPrefix('idle', 'idle', 12, false);
-				animation.addByPrefix('singDOWN', 'singDOWN', 12, false);
-				animation.addByPrefix('singDOWNmiss', 'missDOWN', 12, false);
-				animation.addByPrefix('singLEFTmiss', 'missLEFT', 12, false);
-				animation.addByPrefix('singRIGHTmiss', 'missRIGHT', 12, false);
-				animation.addByPrefix('singUPmiss', 'missUP', 12, false);
-				animation.addByPrefix('singLEFT', 'singLEFT', 12, false);
-				animation.addByPrefix('singRIGHT', 'singRIGHT', 12, false);
-				animation.addByPrefix('singUP', 'singUP', 12, false);
+				animation.addByPrefix('idle','idle',12,false);
+				animation.addByPrefix('singDOWN','singDOWN',12,false);
+				animation.addByPrefix('singDOWNmiss','missDOWN',12,false);
+				animation.addByPrefix('singLEFTmiss','missLEFT',12,false);
+				animation.addByPrefix('singRIGHTmiss','missRIGHT',12,false);
+				animation.addByPrefix('singUPmiss','missUP',12,false);
+				animation.addByPrefix('singLEFT','singLEFT',12,false);
+				animation.addByPrefix('singRIGHT','singRIGHT',12,false);
+				animation.addByPrefix('singUP','singUP',12,false);
 
 				addOffset('idle');
 				addOffset("singDOWN", -4, -135);
-				addOffset("singDOWNmiss", -4, -135);
 				addOffset("singLEFT", -18, -27);
-				addOffset("singLEFTmiss", -18, -27);
 				addOffset("singRIGHT", -2, 2);
-				addOffset("singRIGHTmiss", -2, 2);
 				addOffset("singUP", 20, 38);
-				addOffset("singUPmiss", 20, 38);
 
 				playAnim('idle');
 				posOffsets = [-180, 0];
 				camOffsets = [180, 0];
 
+			// -------------------------------------------------------------
 			case 'lily':
 				createAtlas();
-
 				setAtlasAnim('idle', 'oIdle');
 				setAtlasAnim('singUP', 'oUp');
 				setAtlasAnim('singLEFT', 'oLeft');
@@ -257,66 +317,64 @@ class Character extends FlxNestedSkewSprite {
 				setAtlasAnim('hit', 'oHit');
 				setAtlasAnim('dodge', 'oDodge');
 
-				loadAtlas(Paths.getImageFunk("characters/lily/spritemap1"), Paths.json("characters/lily/spritemap1", "images"),
-					Paths.json("characters/lily/Animation", "images"));
+				loadAtlas(
+					Paths.getImageFunk("characters/lily/spritemap1"),
+					Paths.json("characters/lily/spritemap1","images"),
+					Paths.json("characters/lily/Animation","images")
+				);
 
 				addOffset('idle');
 				addOffset("singDOWN", 108, -181);
-				addOffset("singDOWNmiss", 108, -190);
-				addOffset("singLEFTmiss", 116, -5);
-				addOffset("singRIGHTmiss", 1, -48);
-				addOffset("singUPmiss", 225, 77);
+				addOffset("singUP", 225, 77);
 				addOffset("singLEFT", 131, -2);
 				addOffset("singRIGHT", -2, -23);
-				addOffset("singUP", 225, 77);
-				addOffset("dodge", 233, 66);
-				addOffset("hit", 259, 131);
 
 				playAnim('idle');
 
+			// -------------------------------------------------------------
 			case 'prisma':
+				isModel = true;
 				modelName = "prisma";
 				modelScale = 50;
+
 				var multiplier = Conductor.bpm / 100;
 				animSpeed = [
 					"default" => 2.1 * multiplier,
 					"idle" => 1.5 * multiplier,
 					"singLEFT" => 2.5 * multiplier
 				];
-				for (thing in ["singUPEnd", "singLEFTEnd", "singRIGHTEnd", "singDOWNEnd"])
+				for (thing in ["singUPEnd","singLEFTEnd","singRIGHTEnd","singDOWNEnd"])
 					animSpeed[thing] = 1.5;
-				isModel = true;
+
 				noLoopList = [
-					"idle", "singUP", "singLEFT", "singRIGHT", "singDOWN", "singUPEnd", "singLEFTEnd", "singRIGHTEnd", "singDOWNEnd", "idleEnd"
+					"idle","singUP","singDOWN","singLEFT","singRIGHT",
+					"singUPEnd","singLEFTEnd","singRIGHTEnd","singDOWNEnd","idleEnd"
 				];
+
 				ambient = 1;
 				specular = 1;
 				diffuse = 1;
 				initYaw = -50;
 				isGlass = true;
+
 				viewX = 600;
 				viewY = 600;
-				if (isPlayer)
-					posOffsets = [viewX / 2, -550];
-				else
-					posOffsets = [-viewX / 2, -550];
-				if (isPlayer)
-					camOffsets = [-viewX / 2, viewY / 2];
-				else
-					camOffsets = [viewX / 2, viewY / 2];
 
+				if (isPlayer) posOffsets = [viewX/2, -550];
+				else          posOffsets = [-viewX/2, -550];
+
+				if (isPlayer) camOffsets = [-viewX/2, viewY/2];
+				else          camOffsets = [viewX/2, viewY/2];
+
+			// -------------------------------------------------------------
 			case 'nogf':
-				// frames = Paths.getSparrowAtlas("nogf");
 				frames = Paths.getSparrowAtlasFunk("characters/nogf");
-				animation.addByPrefix('idle', 'BUMP', 24, false);
-				animation.play("idle");
-
+				animation.addByPrefix('idle','BUMP',24,false);
 				playAnim('idle');
 
+			// -------------------------------------------------------------
 			case 'gf' | 'gfSinger':
-				// GIRLFRIEND CODE
 				createAtlas();
-
 				setAtlasAnim('cheer', 'GF CheerF');
 				setAtlasAnim('singLEFT', 'GF left noteF');
 				setAtlasAnim('singRIGHT', 'GF Right NoteF');
@@ -327,771 +385,821 @@ class Character extends FlxNestedSkewSprite {
 				setAtlasAnim('danceRight', 'GF Dancing Beat RIGHTF');
 				setAtlasAnim('scared', 'GF FEARF', true);
 
-				loadAtlas(Paths.getImageFunk("characters/gf/spritemap"), Paths.json("characters/gf/spritemap", "images"),
-					Paths.json("characters/gf/Animation", "images"));
+				loadAtlas(
+					Paths.getImageFunk("characters/gf/spritemap"),
+					Paths.json("characters/gf/spritemap","images"),
+					Paths.json("characters/gf/Animation","images")
+				);
 
-				var yOffet = -150;
+				var yOff:Float = -150;
 
 				addOffset('cheer', -200, -449);
-				addOffset('sad', -2, -18 + yOffet);
-				addOffset('danceLeft', 0, -4 + yOffet);
-				addOffset('danceRight', 0, 0 + yOffet);
-				addOffset("singUP", 0, -11 + yOffet);
-				addOffset("singRIGHT", 0, -5 + yOffet);
-				addOffset("singLEFT", 0, -3 + yOffet);
-				addOffset("singDOWN", 0, -31 + yOffet);
-				addOffset('scared', -2, -17 + yOffet);
+				addOffset('sad', -2, -18 + yOff);
+				addOffset('danceLeft', 0, -4 + yOff);
+				addOffset('danceRight', 0, 0 + yOff);
+				addOffset("singUP", 0, -11 + yOff);
+				addOffset("singRIGHT", 0, -5 + yOff);
+				addOffset("singLEFT", 0, -3 + yOff);
+				addOffset("singDOWN", 0, -31 + yOff);
+				addOffset('scared', -2, -17 + yOff);
 
 				playAnim('danceRight');
 
+			// -------------------------------------------------------------
 			case 'dad':
-				// DAD ANIMATION LOADING CODE
 				createAtlas();
-				setAtlasAnim('idle', 'Dad idle danceF');
-				setAtlasAnim('singUP', 'Dad Sing Note UPF');
-				setAtlasAnim('singRIGHT', 'Dad Sing Note RIGHTF');
-				setAtlasAnim('singDOWN', 'Dad Sing Note DOWNF');
-				setAtlasAnim('singLEFT', 'Dad Sing Note LEFTF');
-				setAtlasAnim('singUPmiss', 'Dad Sing Note UPmissF');
-				setAtlasAnim('singRIGHTmiss', 'Dad Sing Note RIGHTmissF');
-				setAtlasAnim('singDOWNmiss', 'Dad Sing Note DOWNmissF');
-				setAtlasAnim('singLEFTmiss', 'Dad Sing Note LEFTmissF');
-				loadAtlas(Paths.getImageFunk("characters/dad/spritemap"), Paths.json("characters/dad/spritemap", "images"),
-					Paths.json("characters/dad/Animation", "images"));
+				setAtlasAnim('idle','Dad idle danceF');
+				setAtlasAnim('singUP','Dad Sing Note UPF');
+				setAtlasAnim('singRIGHT','Dad Sing Note RIGHTF');
+				setAtlasAnim('singDOWN','Dad Sing Note DOWNF');
+				setAtlasAnim('singLEFT','Dad Sing Note LEFTF');
+				setAtlasAnim('singUPmiss','Dad Sing Note UPmissF');
+				setAtlasAnim('singRIGHTmiss','Dad Sing Note RIGHTmissF');
+				setAtlasAnim('singDOWNmiss','Dad Sing Note DOWNmissF');
+				setAtlasAnim('singLEFTmiss','Dad Sing Note LEFTmissF');
+
+				loadAtlas(
+					Paths.getImageFunk("characters/dad/spritemap"),
+					Paths.json("characters/dad/spritemap","images"),
+					Paths.json("characters/dad/Animation","images")
+				);
 
 				addOffset('idle');
 				addOffset("singUP", -1, 61);
 				addOffset("singRIGHT", -4, 26);
 				addOffset("singLEFT", 38, 7);
 				addOffset("singDOWN", 2, -8);
-				addOffset("singUPmiss", -1, 61);
-				addOffset("singRIGHTmiss", -4, 26);
-				addOffset("singLEFTmiss", 38, 7);
-				addOffset("singDOWNmiss", 2, -8);
 
 				playAnim('idle');
+				initFacing = FlxObject.LEFT;
+
+			// -------------------------------------------------------------
 			case 'spooky':
-				// frames = Paths.getSparrowAtlas("spooky_kids_assets");
 				frames = Paths.getSparrowAtlasFunk("characters/spooky_kids_assets");
-				animation.addByPrefix('singUP', 'spooky UP NOTE', 24, false);
-				animation.addByPrefix('singDOWN', 'spooky DOWN note', 24, false);
-				animation.addByPrefix('singLEFT', 'note sing left', 24, false);
-				animation.addByPrefix('singRIGHT', 'spooky sing right', 24, false);
-				animation.addByIndices('danceLeft', 'spooky dance idle', [0, 2, 6], "", 12, false);
-				animation.addByIndices('danceRight', 'spooky dance idle', [8, 10, 12, 14], "", 12, false);
+				animation.addByPrefix('singUP','spooky UP NOTE',24,false);
+				animation.addByPrefix('singDOWN','spooky DOWN note',24,false);
+				animation.addByPrefix('singLEFT','note sing left',24,false);
+				animation.addByPrefix('singRIGHT','spooky sing right',24,false);
+				animation.addByIndices('danceLeft','spooky dance idle',[0,2,6],"",12,false);
+				animation.addByIndices('danceRight','spooky dance idle',[8,10,12,14],"",12,false);
 
 				addOffset('danceLeft');
 				addOffset('danceRight');
-
 				addOffset("singUP", -18, 25);
 				addOffset("singRIGHT", -130, -14);
 				addOffset("singLEFT", 124, -13);
 				addOffset("singDOWN", -46, -144);
 
 				playAnim('danceRight');
+
+			// -------------------------------------------------------------
 			case 'mom':
 				createAtlas();
-				setAtlasAnim('idle', "Mom IdleF");
-				setAtlasAnim('singUP', "Mom Up PoseF");
-				setAtlasAnim('singDOWN', "MOM DOWN POSEF");
-				setAtlasAnim('singLEFT', 'Mom Left PoseF');
-				setAtlasAnim('singRIGHT', 'Mom Pose LeftF');
-				setAtlasAnim('singUPmiss', "Mom Up PosemissF");
-				setAtlasAnim('singDOWNmiss', "MOM DOWN POSEmissF");
-				setAtlasAnim('singLEFTmiss', 'Mom Left PosemissF');
-				setAtlasAnim('singRIGHTmiss', 'Mom Pose LeftmissF');
-				loadAtlas(Paths.getImageFunk("characters/mom/spritemap"), Paths.json("characters/mom/spritemap", "images"),
-					Paths.json("characters/mom/Animation", "images"));
+				setAtlasAnim('idle','Mom IdleF');
+				setAtlasAnim('singUP','Mom Up PoseF');
+				setAtlasAnim('singDOWN','MOM DOWN POSEF');
+				setAtlasAnim('singLEFT','Mom Left PoseF');
+				setAtlasAnim('singRIGHT','Mom Pose LeftF');
+
+				loadAtlas(
+					Paths.getImageFunk("characters/mom/spritemap"),
+					Paths.json("characters/mom/spritemap","images"),
+					Paths.json("characters/mom/Animation","images")
+				);
 
 				addOffset('idle', 0, -25);
 				addOffset("singUP", 77, 46);
 				addOffset("singRIGHT", -19, -79);
 				addOffset("singLEFT", 280, -23);
 				addOffset("singDOWN", 30, -232);
-				addOffset("singUPmiss", 77, 46);
-				addOffset("singRIGHTmiss", -19, -79);
-				addOffset("singLEFTmiss", 280, -23);
-				addOffset("singDOWNmiss", 30, -232);
 
 				playAnim('idle');
 
+			// -------------------------------------------------------------
 			case 'pico':
 				createAtlas();
-				setAtlasAnim('idle', "Pico Idle DanceF");
-				setAtlasAnim('singUP', 'pico Up noteF');
-				setAtlasAnim('singDOWN', 'Pico Down NoteF');
-				setAtlasAnim('singLEFT', 'Pico NOTE LEFTF');
-				setAtlasAnim('singRIGHT', 'Pico Note RightF');
-				setAtlasAnim('singRIGHTmiss', 'Pico Note Right MissF');
-				setAtlasAnim('singLEFTmiss', 'Pico NOTE LEFT missF');
-				setAtlasAnim('singUPmiss', 'pico Up note missF');
-				setAtlasAnim('singDOWNmiss', 'Pico Down Note MISSF');
-				setAtlasAnim('attack', 'pico shootF');
-				loadAtlas(Paths.getImageFunk("characters/pico/spritemap"), Paths.json("characters/pico/spritemap", "images"),
-					Paths.json("characters/pico/Animation", "images"));
+				setAtlasAnim('idle','Pico Idle DanceF');
+				setAtlasAnim('singUP','pico Up noteF');
+				setAtlasAnim('singDOWN','Pico Down NoteF');
+				setAtlasAnim('singLEFT','Pico NOTE LEFTF');
+				setAtlasAnim('singRIGHT','Pico Note RightF');
+				setAtlasAnim('singRIGHTmiss','Pico Note Right MissF');
+				setAtlasAnim('singLEFTmiss','Pico NOTE LEFT missF');
+				setAtlasAnim('singUPmiss','pico Up note missF');
+				setAtlasAnim('singDOWNmiss','Pico Down Note MISSF');
+				setAtlasAnim('attack','pico shootF');
+
+				loadAtlas(
+					Paths.getImageFunk("characters/pico/spritemap"),
+					Paths.json("characters/pico/spritemap","images"),
+					Paths.json("characters/pico/Animation","images")
+				);
 
 				addOffset('idle');
 				addOffset("singUP", 38, 65);
 				addOffset("singLEFT", 100, -7);
 				addOffset("singRIGHT", -50, 13);
 				addOffset("singDOWN", 80, -74);
-				addOffset("singUPmiss", 33, 69);
-				addOffset("singLEFTmiss", 90, 28);
-				addOffset("singRIGHTmiss", -44, 50);
-				addOffset("singDOWNmiss", 76, -37);
-				addOffset("attack", 321, 6);
 
 				playAnim('idle');
 				initFacing = FlxObject.LEFT;
 
+			// -------------------------------------------------------------
 			case 'bf':
 				createAtlas();
+				setAtlasAnim('idle','BF idle danceF');
+				setAtlasAnim('singUP','BF NOTE UPF');
+				setAtlasAnim('singLEFT','BF NOTE LEFTF');
+				setAtlasAnim('singRIGHT','BF NOTE RIGHTF');
+				setAtlasAnim('singDOWN','BF NOTE DOWNF');
+				setAtlasAnim('singUPmiss','BF NOTE UP MISSF');
+				setAtlasAnim('singLEFTmiss','BF NOTE LEFT MISSF');
+				setAtlasAnim('singRIGHTmiss','BF NOTE RIGHT MISSF');
+				setAtlasAnim('singDOWNmiss','BF NOTE DOWN MISSF');
+				setAtlasAnim('hey','BF HEY!!F');
+				setAtlasAnim('hit','BF hit copyF');
+				setAtlasAnim('dodge','boyfriend dodgeF');
+				setAtlasAnim('scared','BF idle shakingF',true);
 
-				setAtlasAnim('idle', 'BF idle danceF');
-				setAtlasAnim('singUP', 'BF NOTE UPF');
-				setAtlasAnim('singLEFT', 'BF NOTE LEFTF');
-				setAtlasAnim('singRIGHT', 'BF NOTE RIGHTF');
-				setAtlasAnim('singDOWN', 'BF NOTE DOWNF');
-				setAtlasAnim('singUPmiss', 'BF NOTE UP MISSF');
-				setAtlasAnim('singLEFTmiss', 'BF NOTE LEFT MISSF');
-				setAtlasAnim('singRIGHTmiss', 'BF NOTE RIGHT MISSF');
-				setAtlasAnim('singDOWNmiss', 'BF NOTE DOWN MISSF');
-				setAtlasAnim('hey', 'BF HEY!!F');
-				// setAtlasAnim('attack', 'boyfriend attack');
-				setAtlasAnim('hit', 'BF hit copyF');
-				setAtlasAnim('dodge', 'boyfriend dodgeF');
-				setAtlasAnim('scared', 'BF idle shakingF', true);
-
-				loadAtlas(Paths.getImageFunk("characters/bf/spritemap"), Paths.json("characters/bf/spritemap", "images"),
-					Paths.json("characters/bf/Animation", "images"));
+				loadAtlas(
+					Paths.getImageFunk("characters/bf/spritemap"),
+					Paths.json("characters/bf/spritemap","images"),
+					Paths.json("characters/bf/Animation","images")
+				);
 
 				addOffset('idle', -5);
 				addOffset("singUP", -21, 66);
 				addOffset("singRIGHT", -51, 9);
 				addOffset("singLEFT", -7, 3);
 				addOffset("singDOWN", -26, -41);
-				addOffset("singUPmiss", -21, 65);
-				addOffset("singRIGHTmiss", -42, 18);
-				addOffset("singLEFTmiss", -9, 14);
-				addOffset("singDOWNmiss", -32, -22);
-				addOffset("hey", -8, 8);
-				addOffset('scared', -17, -5);
-				addOffset('dodge', -1, -12);
-				addOffset('hit', 17, 41);
 
 				playAnim('idle');
-
 				initFacing = FlxObject.LEFT;
 
+			// -------------------------------------------------------------
 			case 'senpai':
 				antialiasing = false;
 				frames = Paths.getSparrowAtlasFunk("characters/senpai");
-				// animation.addByPrefix('idle', 'Senpai Idle', 24, false);
-				animation.addByPrefix('danceLeft', 'Senpai IdleA', 24, false);
-				animation.addByPrefix('danceRight', 'Senpai IdleB', 24, false);
-				animation.addByPrefix('singUP', 'SENPAI UP NOTE', 24, false);
-				animation.addByPrefix('singLEFT', 'SENPAI LEFT NOTE', 24, false);
-				animation.addByPrefix('singRIGHT', 'SENPAI RIGHT NOTE', 24, false);
-				animation.addByPrefix('singDOWN', 'SENPAI DOWN NOTE', 24, false);
-				animation.addByPrefix('singUPmiss', 'Angry Senpai UP NOTE', 24, false);
-				animation.addByPrefix('singLEFTmiss', 'Angry Senpai LEFT NOTE', 24, false);
-				animation.addByPrefix('singRIGHTmiss', 'Angry Senpai RIGHT NOTE', 24, false);
-				animation.addByPrefix('singDOWNmiss', 'Angry Senpai DOWN NOTE', 24, false);
+
+				animation.addByPrefix('danceLeft','Senpai IdleA',24,false);
+				animation.addByPrefix('danceRight','Senpai IdleB',24,false);
+				animation.addByPrefix('singUP','SENPAI UP NOTE',24,false);
+				animation.addByPrefix('singLEFT','SENPAI LEFT NOTE',24,false);
+				animation.addByPrefix('singRIGHT','SENPAI RIGHT NOTE',24,false);
+				animation.addByPrefix('singDOWN','SENPAI DOWN NOTE',24,false);
+				animation.addByPrefix('singUPmiss','Angry Senpai UP NOTE',24,false);
 
 				camOffsets = [0, 15];
 				posOffsets = [0, 15];
 
-				// addOffset('idle');
 				addOffset('danceLeft');
 				addOffset('danceRight');
 				addOffset("singUP", 1, 6);
 				addOffset("singRIGHT", 1);
 				addOffset("singLEFT", 5);
 				addOffset("singDOWN", 2);
-				addOffset("singUPmiss", 1, 6);
-				addOffset("singRIGHTmiss");
-				addOffset("singLEFTmiss", 4, 1);
-				addOffset("singDOWNmiss", 1, 1);
 
-				// playAnim('idle');
 				playAnim('danceRight');
 
-				setGraphicSize(Std.int(width * 6));
-				updateHitbox();
-
+			// -------------------------------------------------------------
 			case 'nothing':
 				antialiasing = false;
-				loadGraphic(FlxGraphic.fromRectangle(1, 1, FlxColor.TRANSPARENT));
+				loadGraphic(FlxGraphic.fromRectangle(1,1,FlxColor.TRANSPARENT));
 		}
+
+		// -------------------------------------------------------------
+		// POST-PROCESSING
+		// -------------------------------------------------------------
 		initWidth = width;
 		initFrameWidth = frameWidth;
 		initHeight = height;
-		setFacingFlip((initFacing == FlxObject.LEFT ? FlxObject.RIGHT : FlxObject.LEFT), true, false);
-		// if (atlasContainer != null)
-		// 	atlasContainer.setFacingFlip((initFacing == FlxObject.LEFT ? FlxObject.RIGHT : FlxObject.LEFT), true, false);
+
+		setFacingFlip(
+			(initFacing == FlxObject.LEFT ? FlxObject.RIGHT : FlxObject.LEFT),
+			true, false
+		);
 
 		dance();
 	}
 
-	public function loadCharacterFile(json:Dynamic) {
-		isAnimateAtlas = false;
 
-		facing = (isPlayer ? FlxObject.LEFT : FlxObject.RIGHT);
+
+	// =====================================================================
+	// LOAD CHARACTER FILE
+	// =====================================================================
+
+	public function loadCharacterFile(json:Dynamic):Void
+	{
+		#if flxanimate
+		isAnimateAtlas = false;
+		#end
+
+		imageFile = json.image;
+		jsonScale = json.scale != null ? json.scale : 1;
+		singDuration = json.sing_duration;
+		healthIcon = json.healthicon;
+		flipX = (json.flip_x != isPlayer);
+		noAntialiasing = json.no_antialiasing;
+		healthColorArray = (json.healthbar_colors != null && json.healthbar_colors.length > 2)
+			? json.healthbar_colors : [161,161,161];
+		editorIsPlayer = json._editor_isPlayer;
+		originalFlipX = json.flip_x;
+
+		scale.set(1,1);
+		antialiasing = !noAntialiasing;
 
 		#if flxanimate
-		var animToFind:String = Paths.getPath('images/' + json.image + '/Animation.json', TEXT);
-		if (#if MODS_ALLOWED FileSystem.exists(animToFind) || #end Assets.exists(animToFind))
+		var animJsonPath = Paths.getPath('images/' + imageFile + '/Animation.json', TEXT);
+		if ((#if MODS_ALLOWED sys.FileSystem.exists(animJsonPath) #else Assets.exists(animJsonPath) #end))
 			isAnimateAtlas = true;
 		#end
 
-		scale.set(1, 1);
-		updateHitbox();
+		//---------------------------------------------------------
+		// Non-flxAnimate: load sparrow/multiatlas
+		//---------------------------------------------------------
+		if (!isAnimateAtlas)
+		{
+			frames = Paths.getMultiAtlas(imageFile.split(","));
+			updateHitbox();
 
-		if (!isAnimateAtlas) {
-			frames = Paths.getMultiAtlas(json.image.split(','));
-
-			if (isModel) {
+			// MODEL loading
+			if (isModel)
+			{
 				modelView = new ModelView(viewX, viewY, ambient, specular, diffuse);
 				loadGraphicFromSprite(modelView.sprite);
 				antialiasing = true;
 			}
-			#if flxanimate
-			else if (atlasActive) {
-				if (facing != initFacing) {
-					if (atlasContainer.animList.contains(animRedirect['singRIGHT'])) {
-						var oldOffset = animOffsets['singRIGHT'];
-						animOffsets['singRIGHT'] = animOffsets['singLEFT'];
-						animOffsets['singLEFT'] = oldOffset;
-						var oldRIGHT = animRedirect['singRIGHT'];
-						animRedirect['singRIGHT'] = animRedirect['singLEFT'];
-						animRedirect['singLEFT'] = oldRIGHT;
+			// AtlasThing (custom atlas system)
+			else if (atlasActive)
+			{
+				if (facing != initFacing)
+				{
+					if (atlasContainer.animList.contains(animRedirect['singRIGHT']))
+					{
+						swapAnimOffsets('singRIGHT','singLEFT');
+						swapRedirect('singRIGHT','singLEFT');
 					}
-					// IF THEY HAVE MISS ANIMATIONS??
-					if (atlasContainer.animList.contains(animRedirect['singRIGHTmiss'])) {
-						var oldOffset = animOffsets['singRIGHTmiss'];
-						animOffsets['singRIGHTmiss'] = animOffsets['singLEFTmiss'];
-						animOffsets['singLEFTmiss'] = oldOffset;
-						var oldRIGHT = animRedirect['singRIGHTmiss'];
-						animRedirect['singRIGHTmiss'] = animRedirect['singLEFTmiss'];
-						animRedirect['singLEFTmiss'] = oldRIGHT;
+					if (atlasContainer.animList.contains(animRedirect['singRIGHTmiss']))
+					{
+						swapAnimOffsets('singRIGHTmiss','singLEFTmiss');
+						swapRedirect('singRIGHTmiss','singLEFTmiss');
 					}
-					if (atlasContainer.animList.contains(animRedirect['singRIGHT-alt'])) {
-						var oldOffset = animOffsets['singRIGHT-alt'];
-						animOffsets['singRIGHT-alt'] = animOffsets['singLEFT-alt'];
-						animOffsets['singLEFT-alt'] = oldOffset;
-						var oldRIGHT = animRedirect['singRIGHT-alt'];
-						animRedirect['singRIGHT-alt'] = animRedirect['singLEFT-alt'];
-						animRedirect['singLEFT-alt'] = oldRIGHT;
+					if (atlasContainer.animList.contains(animRedirect['singRIGHT-alt']))
+					{
+						swapAnimOffsets('singRIGHT-alt','singLEFT-alt');
+						swapRedirect('singRIGHT-alt','singLEFT-alt');
 					}
-					atlasContainer.finishCallback = animationEnd;
-				} else {
-					atlas = new FlxAnimate();
-					atlas.showPivot = false;
-					try
-						if (facing != initFacing) {
-							Paths.loadAnimateAtlas(atlas, json.image);
-						} catch (e:haxe.Exception) {
-						FlxG.log.warn('Could not load atlas ${json.image}: $e');
-						trace(e.stack);
-					}
-			#end
-
-					if (animation.getByName('singRIGHT') != null) {
-						var oldRight = animation.getByName('singRIGHT').frames;
-						var oldOffset = animOffsets['singRIGHT'];
-						animation.getByName('singRIGHT').frames = animation.getByName('singLEFT').frames;
-						animOffsets['singRIGHT'] = animOffsets['singLEFT'];
-						animation.getByName('singLEFT').frames = oldRight;
-						animOffsets['singLEFT'] = oldOffset;
-					}
-					// IF THEY HAVE MISS ANIMATIONS??
-					if (animation.getByName('singRIGHTmiss') != null) {
-						var oldMiss = animation.getByName('singRIGHTmiss').frames;
-						var oldOffset = animOffsets['singRIGHTmiss'];
-						animation.getByName('singRIGHTmiss').frames = animation.getByName('singLEFTmiss').frames;
-						animOffsets['singRIGHTmiss'] = animOffsets['singLEFTmiss'];
-						animation.getByName('singLEFTmiss').frames = oldMiss;
-						animOffsets['singLEFTmiss'] = oldOffset;
-					}
-					if (animation.getByName('singRIGHT-alt') != null) {
-						var oldRight = animation.getByName('singRIGHT-alt').frames;
-						var oldOffset = animOffsets['singRIGHT-alt'];
-						animation.getByName('singRIGHT-alt').frames = animation.getByName('singLEFT-alt').frames;
-						animOffsets['singRIGHT-alt'] = animOffsets['singLEFT-alt'];
-						animation.getByName('singLEFT-alt').frames = oldRight;
-						animOffsets['singLEFT-alt'] = oldOffset;
-					}
-					// data
-					healthIcon = json.healthicon;
-					singDuration = json.sing_duration;
-					flipX = (json.flip_x != isPlayer);
-					healthColorArray = (json.healthbar_colors != null && json.healthbar_colors.length > 2) ? json.healthbar_colors : [161, 161, 161];
-					vocalsFile = json.vocals_file != null ? json.vocals_file : '';
-					originalFlipX = (json.flip_x == true);
-					editorIsPlayer = json._editor_isPlayer;
-
-					animation.finishCallback = animationEnd;
 				}
-				function createAtlas() {
-					atlasActive = true;
-					atlasContainer = new AtlasThing();
-				}
-				// animations
 
-				#if flxanimate
-				else {
-					if (animIndices != null && animIndices.length > 0)
-						atlas.anim.addBySymbolIndices(animAnim, animName, animIndices, animFps, animLoop);
+				atlasContainer.finishCallback = animationEnd;
+			}
+
+			// Normal animation swapping if facing reversed
+			if (!isAnimateAtlas && !atlasActive)
+			{
+				if (facing != initFacing)
+				{
+					swapAnimFrames("singRIGHT","singLEFT");
+					swapAnimFrames("singRIGHTmiss","singLEFTmiss");
+					swapAnimFrames("singRIGHT-alt","singLEFT-alt");
+				}
+			}
+		}
+
+		//---------------------------------------------------------
+		// flxAnimate atlas loading
+		//---------------------------------------------------------
+		#if flxanimate
+		if (isAnimateAtlas)
+		{
+			atlas = new FlxAnimate();
+			atlas.showPivot = false;
+
+			try { Paths.loadAnimateAtlas(atlas, imageFile); }
+			catch(e:Dynamic)
+			{
+				FlxG.log.warn("Could not load Animate atlas for " + imageFile + ": " + e);
+			}
+
+			copyAtlasValues();
+		}
+		#end
+
+		//---------------------------------------------------------
+		// Load animations from JSON
+		//---------------------------------------------------------
+		if (json.animations != null)
+		{
+			for (anim in json.animations)
+			{
+				animationsArray.push(anim);
+
+				var animName = anim.anim;
+				var prefix = anim.name;
+				var fps = anim.fps;
+				var loop = anim.loop;
+
+				var offs = anim.offsets;
+
+				// AtlasThing
+				if (atlasActive)
+				{
+					animRedirect[animName] = prefix;
+					atlasContainer.onlyTheseAnims.push(prefix);
+					atlasContainer.setLooping(prefix, loop);
+
+					if (offs != null && offs.length > 1)
+						addOffset(animName, offs[0], offs[1]);
 					else
-						atlas.anim.addBySymbol(animAnim, animName, animFps, animLoop);
+						addOffset(animName, 0, 0);
 				}
+				else
+				{
+					// Normal sparrow/multiatlas
+					if (anim.indices != null && anim.indices.length > 0)
+						animation.addByIndices(animName, prefix, anim.indices, "", fps, loop);
+					else
+						animation.addByPrefix(animName, prefix, fps, loop);
+
+					if (offs != null && offs.length > 1)
+						addOffset(animName, offs[0], offs[1]);
+					else
+						addOffset(animName, 0, 0);
+				}
+			}
+		}
+
+		animation.finishCallback = animationEnd;
+		updateHitbox();
+	}
+
+
+	// =====================================================================
+	// SWAP HELPERS
+	// =====================================================================
+
+	private inline function swapAnimOffsets(a:String, b:String):Void
+	{
+		if (!animOffsets.exists(a) || !animOffsets.exists(b)) return;
+		var oa = animOffsets[a];
+		animOffsets[a] = animOffsets[b];
+		animOffsets[b] = oa;
+	}
+
+	private inline function swapRedirect(a:String, b:String):Void
+	{
+		var oa = animRedirect[a];
+		animRedirect[a] = animRedirect[b];
+		animRedirect[b] = oa;
+	}
+
+	private inline function swapAnimFrames(a:String, b:String):Void
+	{
+		if (animation.getByName(a) != null && animation.getByName(b) != null)
+		{
+			var fa = animation.getByName(a).frames;
+			var fb = animation.getByName(b).frames;
+			var oa = animOffsets[a];
+			var ob = animOffsets[b];
+
+			animation.getByName(a).frames = fb;
+			animation.getByName(b).frames = fa;
+
+			animOffsets[a] = ob;
+			animOffsets[b] = oa;
+		}
+	}
+
+	// =====================================================================
+	// UPDATE LOOP
+	// =====================================================================
+
+	override function update(elapsed:Float):Void
+	{
+		#if flxanimate
+		if (isAnimateAtlas && atlas != null)
+			atlas.update(elapsed);
+		#end
+
+		tryLoadModel();
+
+		// HEY TIMER
+		if (heyTimer > 0)
+		{
+			var rate:Float = (PlayState.instance != null ? PlayState.instance.playbackRate : 1.0);
+			heyTimer -= elapsed * rate;
+
+			if (heyTimer <= 0)
+			{
+				if (specialAnim)
+				{
+					var nm = getAnimationName();
+					if (nm == "hey" || nm == "cheer")
+					{
+						specialAnim = false;
+						dance();
+					}
+				}
+				heyTimer = 0;
+			}
+		}
+
+		// HOLD TIMER LOGIC (sing poses)
+		if (!isPlayer && !specialAnim)
+		{
+			if (getAnimationName().startsWith("sing"))
+			{
+				holdTimer += elapsed;
+
+				var limit:Float = Conductor.stepCrochet * 0.0011 * singDuration;
+				#if FLX_PITCH
+				if (FlxG.sound.music != null)
+					limit /= FlxG.sound.music.pitch;
 				#end
-				if (anim.offsets != null && anim.offsets.length > 1)
-					addOffset(anim.anim, anim.offsets[0], anim.offsets[1]);
-				else
-					addOffset(anim.anim, 0, 0);
+
+				if (holdTimer >= limit)
+				{
+					holdTimer = 0;
+					dance();
+				}
 			}
-			#if flxanimate
-			if (isAnimateAtlas)
-				copyAtlasValues();
-			#end
-			// trace('Loaded file to character ' + curCharacter);
 		}
 
-		override function update(elapsed:Float) {
-			if (isAnimateAtlas)
-				atlas.update(elapsed);
+		super.update(elapsed);
+	}
 
-			tryLoadModel();
 
-			if (debugMode
-				|| (!isAnimateAtlas && animation.curAnim == null)
-				|| (isAnimateAtlas && (atlas.anim.curInstance == null || atlas.anim.curSymbol == null)))
-				if (isModel && model != null && model.fullyLoaded && modelView != null) {
-					super.update(elapsed);
-					return;
+	// =====================================================================
+	// PLAY ANIMATION (FULL MERGED VERSION)
+	// =====================================================================
 
-					modelView.update();
-					model.update();
-				}
-			if (heyTimer > 0)
-				if (!isPlayer || PlayState.autoPlay) {
-					var rate:Float = (PlayState.instance != null ? PlayState.instance.playbackRate : 1.0);
-					heyTimer -= elapsed * rate;
-					if (heyTimer <= 0)
-						if (getCurAnim().startsWith('sing')) {
-							var anim:String = getAnimationName();
-							if (specialAnim && (anim == 'hey' || anim == 'cheer')) {
-								specialAnim = false;
-								dance();
-							}
-							heyTimer = 0;
+	public function playAnim(AnimName:String, Force:Bool = false, Reversed:Bool = false, Frame:Int = 0):Void
+	{
+		if (curCharacter == "nothing") return;
 
-							holdTimer += elapsed;
-						} else if (specialAnim && isAnimationFinished()) {
-							specialAnim = false;
-							dance();
-						} else if (getAnimationName().endsWith('miss') && isAnimationFinished()) {
-							dance();
-							finishAnimation();
+		_lastPlayedAnimation = AnimName;
 
-							var dadVar:Float = 4;
+		//---------------------------------------------------------
+		// flxAnimate system
+		//---------------------------------------------------------
+		#if flxanimate
+		if (isAnimateAtlas && atlas != null)
+		{
+			atlas.anim.play(AnimName, Force, Reversed, Frame);
+			atlas.update(0);
 
-							if (curCharacter == 'dad')
-								dadVar = 6.1;
-							if (holdTimer >= Conductor.stepCrochet * dadVar * 0.001) {
-								idleEnd();
-								holdTimer = 0;
-							}
-							switch (curCharacter) switch (curCharacter) {
-								case 'pico-speaker':
-									if (animationNotes.length > 0 && Conductor.songPosition > animationNotes[0][0]) {
-										var noteData:Int = 1;
-										if (animationNotes[0][1] > 2)
-											noteData = 3;
-
-										noteData += FlxG.random.int(0, 1);
-										playAnim('shoot' + noteData, true);
-										animationNotes.shift();
-									}
-									if (isAnimationFinished())
-										playAnim(getAnimationName(), false, false, animation.curAnim.frames.length - 3);
-							}
-							if (getAnimationName().startsWith('sing'))
-								holdTimer += elapsed;
-							else if (isPlayer)
-								holdTimer = 0;
-
-							if (!isPlayer
-								&& holdTimer >= Conductor.stepCrochet * (0.0011 #if FLX_PITCH / (FlxG.sound.music != null ? FlxG.sound.music.pitch : 1) #end) * singDuration) {
-								dance();
-								holdTimer = 0;
-							}
-							var name:String = getAnimationName();
-							if (isAnimationFinished() && hasAnimation('$name-loop'))
-								playAnim('$name-loop');
-
-							case 'gf':
-								if (getCurAnim() == 'hairFall' && getCurAnimFinished())
-									playAnim('danceRight');
-						}
-					super.update(elapsed);
-				}
-			inline public function isAnimationNull():Bool {
-				return !isAnimateAtlas ? (animation.curAnim == null) : (atlas.anim.curInstance == null || atlas.anim.curSymbol == null);
+			if (animOffsets.exists(AnimName))
+			{
+				var o = animOffsets[AnimName];
+				offset.set(o[0], o[1]);
 			}
-			var _lastPlayedAnimation:String;
-
-			inline public function getAnimationName():String {
-				return _lastPlayedAnimation;
-			}
-			public function isAnimationFinished():Bool {
-				if (isAnimationNull())
-					return false;
-				return !isAnimateAtlas ? animation.curAnim.finished : atlas.anim.finished;
-			}
-			public function finishAnimation():Void {
-				if (isAnimationNull())
-					return;
-
-				if (!isAnimateAtlas)
-					animation.curAnim.finish();
-				else
-					atlas.anim.curFrame = atlas.anim.length - 1;
-			}
-			public function hasAnimation(anim:String):Bool {
-				return animOffsets.exists(anim);
-			}
-			public var animPaused(get, set):Bool;
-
-			private function get_animPaused():Bool {
-				if (isAnimationNull())
-					return false;
-				return !isAnimateAtlas ? animation.curAnim.paused : atlas.anim.isPlaying;
-			}
-			private function set_animPaused(value:Bool):Bool {
-				if (isAnimationNull())
-					return value;
-				if (!isAnimateAtlas)
-					animation.curAnim.paused = value;
-				else {
-					if (value)
-						atlas.pauseAnimation();
-					else
-						atlas.resumeAnimation();
-				}
-				return value;
-			}
-			public var danced:Bool = false;
-			private var danced:Bool = false;
-
-			/**
+			return;
 		}
-		}
-		* FOR GF DANCING SHIT
-	 */
-			public function dance(?ignoreDebug:Bool = false) {
-				if (skipDance || specialAnim)
-					return;
-				if (danceIdle)
-					playAnim((danced = !danced) ? 'danceRight' : 'danceLeft');
-				else
-					playAnim('idle');
+		#end
+
+		//---------------------------------------------------------
+		// AtlasThing system
+		//---------------------------------------------------------
+		if (atlasActive)
+		{
+			var real = animRedirect.exists(AnimName) ? animRedirect[AnimName] : AnimName;
+			if (atlasContainer.animList.contains(real))
+			{
+				atlasContainer.play(real, Force, Reversed, Frame);
+
+				if (animOffsets.exists(AnimName))
+				{
+					var o = animOffsets[AnimName];
+					offset.set(o[0], o[1]);
+				}
+
+				return;
 			}
-			case 'senpai':
+		}
+
+		//---------------------------------------------------------
+		// Normal animations
+		//---------------------------------------------------------
+		if (animation.getByName(AnimName) != null)
+		{
+			animation.play(AnimName, Force, Reversed, Frame);
+
+			if (animOffsets.exists(AnimName))
+			{
+				var o = animOffsets[AnimName];
+				offset.set(o[0], o[1]);
+			}
+		}
+
+
+		//---------------------------------------------------------
+		// Post-play Behavior
+		//---------------------------------------------------------
+
+		// GF dance logic
+		if (curCharacter == "gf" || curCharacter == "gfSinger")
+		{
+			if (AnimName == "singLEFT")
+				danced = true;
+			if (AnimName == "singUP" || AnimName == "singDOWN")
 				danced = !danced;
-
-				if (danced)
-					playAnim('danceRight', true);
-				else
-					playAnim('danceLeft', true);
-
-			case 'spooky':
-				danced = !danced;
-
-				if (danced)
-					playAnim('danceRight', true);
-				else
-					playAnim('danceLeft', true);
-			default:
-				if (holdTimer == 0)
-					playAnim('idle', true);
 		}
 
-		else if (holdTimer == 0) {
-			if (isModel && model == null) {
-				trace("NO DANCE - NO MODEL");
-				return;
-			}
-			if (isModel && !model.fullyLoaded) {
-				trace("NO DANCE - NO FULLY LOAD");
-				return;
-			}
-			if (isModel && !noLoopList.contains('idle'))
-				return;
-			playAnim('idle', true);
+		// Dad/Mom trim
+		if ((curCharacter == "dad" || curCharacter == "mom")
+			&& !AnimName.contains("miss"))
+		{
+			var fc = getFrameCount(AnimName);
+			if (fc > 4)
+				finishAnimation();
 		}
-		public function idleEnd(?ignoreDebug:Bool = false) {
-			if (curCharacter == 'nothing')
-				return;
 
-			if (!isModel && (!debugMode || ignoreDebug) && !atlasActive) {
-				switch (curCharacter) {
-					case 'gf' | 'gf-car' | 'gf-christmas' | 'gf-pixel' | "spooky" | "senpai" | "gfSinger":
-						playAnim('danceRight', true, false, animation.getByName('danceRight').numFrames - 1);
-					default:
-						playAnim('idle', true, false, animation.getByName('idle').numFrames - 1);
-				}
-			else if (!isModel && (!debugMode || ignoreDebug)) {
-				switch (curCharacter) {
-					case 'gf' | 'gf-car' | 'gf-christmas' | 'gf-pixel' | "spooky" | "senpai" | "gfSinger":
-						playAnim('danceRight', true, false, atlasContainer.maxIndex[animRedirect['danceRight']]);
-					default:
-						playAnim('idle', true, false, atlasContainer.maxIndex[animRedirect['idle']]);
-				}
-			else if (isModel && (!debugMode || ignoreDebug)) {
-				if (animExists(getCurAnim() + "End"))
-					playAnim(getCurAnim() + "End", true, false);
-				else
-					playAnim('idleEnd', true, false);
+		// BF trim miss
+		if ((curCharacter == "bf" || curCharacter == "bf-christmas")
+			&& AnimName.contains("miss"))
+		{
+			var fc2 = getFrameCount(AnimName);
+			if (fc2 > 4)
+				finishAnimation();
+		}
+
+		// Monster special trim
+		if (curCharacter == "monster" || curCharacter == "monster-christmas")
+		{
+			switch(AnimName)
+			{
+				case "idle":     if (getFrameCount(AnimName) > 10) finishAnimation();
+				case "singUP":   if (getFrameCount(AnimName) > 8)  finishAnimation();
+				case "singDOWN": if (getFrameCount(AnimName) > 7)  finishAnimation();
+				case "singLEFT": if (getFrameCount(AnimName) > 5)  finishAnimation();
+				case "singRIGHT":if (getFrameCount(AnimName) > 6)  finishAnimation();
 			}
-				var curAtlasAnim:String;
+		}
+	}
 
-				canAutoIdle = true;
+
+	// =====================================================================
+	// DANCE LOGIC
+	// =====================================================================
+
+	public function dance(?ignoreDebug:Bool = false):Void
+	{
+		if (skipDance || specialAnim) return;
+
+		if (danceIdle)
+		{
+			danced = !danced;
+			playAnim(danced ? "danceRight" : "danceLeft");
+		}
+		else
+			playAnim("idle");
+	}
+
+
+	// =====================================================================
+	// IDLE END BEHAVIOR
+	// =====================================================================
+
+	public function idleEnd(?ignoreDebug:Bool = false):Void
+	{
+		if (curCharacter == "nothing") return;
+
+		if (!isModel && !atlasActive)
+		{
+			if (curCharacter.startsWith("gf") || curCharacter == "spooky" || curCharacter == "senpai")
+			{
+				var fr = animation.getByName("danceRight");
+				if (fr != null)
+					playAnim("danceRight", true, false, fr.numFrames - 1);
 			}
-				public function addOffset(name:String, x:Float = 0, y:Float = 0) {
-					animOffsets[name] = [x, y];
-				}
-			else {
-				atlas.anim.play(AnimName, Force, Reversed, Frame);
-				atlas.update(0);
+			else
+			{
+				var fr = animation.getByName("idle");
+				if (fr != null)
+					playAnim("idle", true, false, fr.numFrames - 1);
 			}
-				_lastPlayedAnimation = AnimName;
+		}
+		else if (atlasActive)
+		{
+			var realIdle = animRedirect.exists("idle") ? animRedirect["idle"] : "idle";
+			var maxFrame = atlasContainer.maxIndex[realIdle];
+			playAnim("idle", true, false, maxFrame);
+		}
+		else if (isModel)
+		{
+			if (animExists(getAnimationName() + "End"))
+				playAnim(getAnimationName() + "End", true, false);
+			else
+				playAnim("idleEnd", true, false);
+		}
 
-				if (hasAnimation(AnimName)) {
-					var daOffset = animOffsets.get(AnimName);
-					offset.set(daOffset[0], daOffset[1]);
-				}
-				// else offset.set(0, 0);
+		canAutoIdle = true;
+	}
 
-				var theAnim = (atlasActive ? getCurAnim() : name);
-				switch (curCharacter) {
-					case "dad" | "mom" | "mom-car" | "bf-car":
-						if (!theAnim.contains('miss')) {
-							playAnim(theAnim, true, false, getFrameCount(theAnim) - 4);
-						}
-						if (curCharacter.startsWith('gf-') || curCharacter == 'gf') {
-							if (AnimName == 'singLEFT')
-								danced = true;
 
-							case "bf" | "bf-christmas":
-								if (theAnim.contains("miss")) {
-									playAnim(theAnim, true, false, getFrameCount(theAnim) - 4);
-								} else if (AnimName == 'singRIGHT')
-									danced = false;
+	// =====================================================================
+	// ANIMATION END CALLBACK
+	// =====================================================================
 
-								if (AnimName == 'singUP' || AnimName == 'singDOWN') danced = !danced;
-						}
-						function loadMappedAnims():Void {
-							try {
-								var songData:SwagSong = Song.getChart('picospeaker', Paths.formatToSongPath(Song.loadedSongName));
-								if (songData != null)
-									for (section in songData.notes)
-										for (songNotes in section.sectionNotes)
-											animationNotes.push(songNotes);
+	public function animationEnd(name:String):Void
+	{
+		if (name.endsWith("miss") || specialAnim)
+			return;
 
-								TankmenBG.animationNotes = animationNotes;
-								animationNotes.sort(sortAnims);
+		if (name.startsWith("sing"))
+		{
+			holdTimer = 0;
+			dance();
+		}
+	}
 
-								case "monster-christmas" | "monster":
-									switch (theAnim) {
-										case "idle":
-											playAnim(theAnim, false, false, 10);
-										case "singUP":
-											playAnim(theAnim, false, false, 8);
-										case "singDOWN":
-											playAnim(theAnim, false, false, 7);
-										case "singLEFT":
-											playAnim(theAnim, false, false, 5);
-										case "singRIGHT":
-											playAnim(theAnim, false, false, 6);
-									}
-							} catch (e:Dynamic) {}
 
-							function sortAnims(Obj1:Array<Dynamic>, Obj2:Array<Dynamic>):Int {
-								return FlxSort.byValues(FlxSort.ASCENDING, Obj1[0], Obj2[0]);
-							}
-							var theAnim = (atlasActive ? getCurAnim() : name);
-							if (theAnim == 'dodge' || theAnim == 'hit' || theAnim == 'attack') {
-								canAutoIdle = true;
-								idleEnd();
-							}
-							public var danceEveryNumBeats:Int = 2;
-							private var settingCharacterUp:Bool = true;
+	// =====================================================================
+	// ANIMATION HELPERS
+	// =====================================================================
 
-							public function recalculateDanceIdle() {
-								var lastDanceIdle:Bool = danceIdle;
-								danceIdle = (hasAnimation('danceLeft' + idleSuffix) && hasAnimation('danceRight' + idleSuffix));
+	public inline function getAnimationName():String
+	{
+		return _lastPlayedAnimation;
+	}
 
-								public function getCurAnim() {
-									if (curCharacter == 'nothing')
-										return "";
+	public inline function isAnimationNull():Bool
+	{
+		#if flxanimate
+		if (isAnimateAtlas)
+			return (atlas == null || atlas.anim.curInstance == null);
+		#end
 
-									if (settingCharacterUp)
-										if (isModel) {
-											danceEveryNumBeats = (danceIdle ? 1 : 2);
-										} else if (lastDanceIdle != danceIdle) {
-											var calc:Float = danceEveryNumBeats;
-											if (danceIdle)
-												calc /= 2;
+		if (atlasActive)
+			return atlasContainer.curAnim == null;
 
-											if (model != null && model.fullyLoaded)
-												return model.currentAnim;
-											else
-												calc *= 2;
+		return (animation.curAnim == null);
+	}
 
-											danceEveryNumBeats = Math.round(Math.max(calc, 1));
+	public function isAnimationFinished():Bool
+	{
+		if (isAnimationNull()) return false;
 
-											return "";
-										}
-									settingCharacterUp = false;
-								}
-								public function addOffset(name:String, x:Float = 0, y:Float = 0) {
-									animOffsets[name] = [x, y];
-								}
-								public function quickAnimAdd(name:String, anim:String) {
-									animation.addByPrefix(name, anim, 24, false);
+		#if flxanimate
+		if (isAnimateAtlas)
+			return atlas.anim.finished;
+		#end
 
-								else if (atlasActive) {
-									return curAtlasAnim;
-								} else
-									return animation.curAnim.name;
-								}
-								// Atlas support
-								// special thanks ne_eo for the references, you're the goat!!
-								@:allow(states.editors.CharacterEditorState)
-								public var isAnimateAtlas(default, null):Bool = false;
-								#if flxanimate
-								public var atlas:FlxAnimate;
-								public override function draw() {
-									var lastAlpha:Float = alpha;
-									var lastColor:FlxColor = color;
-									if (missingCharacter) {
-										alpha *= 0.6;
-										color = FlxColor.BLACK;
-									}
-									public function getFrameCount(name:String) {
-										if (atlasActive) {
-											return atlasContainer.maxIndex[animRedirect[name]] + 1;
-										} else if (!isModel) {
-											return animation.getByName(name).numFrames;
-										}
-										return -1;
-									}
-									if (isAnimateAtlas) {
-										if (atlas.anim.curInstance != null) {
-											copyAtlasValues();
-											atlas.draw();
-											alpha = lastAlpha;
-											color = lastColor;
-											if (missingCharacter && visible) {
-												missingText.x = getMidpoint().x - 150;
-												missingText.y = getMidpoint().y - 10;
-												missingText.draw();
-											}
-											public function getCurAnimFinished() {
-												if (atlasActive)
-													return atlasContainer.curAnimFinished;
-												else
-													return animation.curAnim.finished;
-											}
-											public function animExists(anim:String) {
-												if (isModel) {
-													if (model != null && model.fullyLoaded)
-														return model.animationSet.hasAnimation(anim);
-													else
-														return false;
-												} else if (atlasActive) {
-													return atlasContainer.animList.contains(animRedirect[anim]);
-												} else
-													return animation.getByName(anim) != null;
-											}
-											override public function updateHitbox():Void {
-												width = Math.abs(scale.x) * frameWidth;
-												height = Math.abs(scale.y) * frameHeight;
-												if (!atlasActive) {
-													offset.set(-0.5 * (width - frameWidth), -0.5 * (height - frameHeight));
-													centerOrigin();
-												}
-												function setAtlasAnim(name:String, animName:String, looping:Bool = false) {
-													animRedirect[name] = animName;
-													atlasContainer.setLooping(animName, looping);
-													atlasContainer.onlyTheseAnims.push(animName);
-												}
-												public function tryLoadModel() {
-													if (!isModel)
-														return;
-												}
-												super.draw();
-												if (missingCharacter && visible)
-													if (modelMutex)
-														return;
-												if (isModel && beganLoading)
-													return;
-												if (isModel && !beganLoading) {
-													alpha = lastAlpha;
-													color = lastColor;
-													missingText.x = getMidpoint().x - 150;
-													missingText.y = getMidpoint().y - 10;
-													missingText.draw();
+		if (atlasActive)
+			return atlasContainer.curAnimFinished;
 
-													beganLoading = true;
-													modelMutex = true;
-													model = new ModelThing(this);
-													modelMutexThing = model;
-												}
-												public function copyAtlasValues()
+		return animation.curAnim.finished;
+	}
 
-													override public function destroy() {
-														atlas = FlxDestroyUtil.destroy(atlas);
-														if (model != null)
-															model.destroy();
-														if (modelView != null)
-															modelView.destroy();
-														super.destroy();
-													}
-												public override function destroy() {
-													atlas = FlxDestroyUtil.destroy(atlas);
+	public function finishAnimation():Void
+	{
+		if (isAnimationNull()) return;
 
-													if (modelMutexThing == model) {
-														modelMutexThing = null;
-														modelMutex = false;
-													}
-													if (model != null)
-														model.destroy();
-													model = null;
-													if (modelView != null)
-														modelView.destroy();
-													modelView = null;
-													if (animSpeed != null) {
-														animSpeed.clear();
-														animSpeed = null;
-													}
-													if (animRedirect != null) {
-														animRedirect.clear();
-														animRedirect = null;
-													}
-													if (animRedirect != null) {
-														animRedirect.clear();
-														animRedirect = null;
-													}
-													// atlasContainer = FlxDestroyUtil.destroy(atlasContainer);
-													super.destroy();
-												}
-								#end
-											}
-										}
-								}
-							}
-						}
-}}}}
+		#if flxanimate
+		if (isAnimateAtlas)
+		{
+			atlas.anim.curFrame = atlas.anim.length - 1;
+			return;
+		}
+		#end
+
+		if (atlasActive)
+		{
+			atlasContainer.forceLastFrame();
+			return;
+		}
+
+		if (animation.curAnim != null)
+			animation.curAnim.finish();
+	}
+
+	public function animExists(anim:String):Bool
+	{
+		if (isModel)
+		{
+			if (model != null && model.fullyLoaded)
+				return model.animationSet.hasAnimation(anim);
+			return false;
+		}
+
+		if (atlasActive)
+			return atlasContainer.animList.contains(animRedirect.exists(anim) ? animRedirect[anim] : anim);
+
+		if (animation.getByName(anim) != null)
+			return true;
+
+		#if flxanimate
+		if (isAnimateAtlas)
+			return atlas.anim.hasAnimation(anim);
+		#end
+
+		return false;
+	}
+
+
+	public function getFrameCount(name:String):Int
+	{
+		if (atlasActive)
+		{
+			var real = animRedirect.exists(name) ? animRedirect[name] : name;
+			return atlasContainer.maxIndex[real] + 1;
+		}
+		else if (!isModel && animation.getByName(name) != null)
+		{
+			return animation.getByName(name).numFrames;
+		}
+		return 1;
+	}
+
+
+	// =====================================================================
+	// RECALCULATE DANCE IDLE
+	// =====================================================================
+
+	public function recalculateDanceIdle():Void
+	{
+		var last = danceIdle;
+		danceIdle = (hasAnimation("danceLeft" + idleSuffix) && hasAnimation("danceRight" + idleSuffix));
+
+		if (settingCharacterUp)
+		{
+			var calc:Float = danceEveryNumBeats;
+
+			if (danceIdle) calc /= 2;
+			else calc *= 2;
+
+			danceEveryNumBeats = Math.round(Math.max(calc,1));
+			settingCharacterUp = false;
+		}
+	}
+
+
+	// =====================================================================
+	// MODEL LOADER
+	// =====================================================================
+
+	public function tryLoadModel():Void
+	{
+		if (!isModel) return;
+		if (beganLoading) return;
+
+		beganLoading = true;
+		modelMutex = true;
+		model = new ModelThing(this);
+		modelMutexThing = model;
+	}
+
+
+	// =====================================================================
+	// ATLAS HELPERS
+	// =====================================================================
+
+	public function createAtlas():Void
+	{
+		atlasActive = true;
+		atlasContainer = new AtlasThing();
+	}
+
+	public function setAtlasAnim(name:String, animName:String, looping:Bool = false):Void
+	{
+		animRedirect[name] = animName;
+		atlasContainer.setLooping(animName, looping);
+		atlasContainer.onlyTheseAnims.push(animName);
+	}
+
+	public function copyAtlasValues():Void
+	{
+		#if flxanimate
+		if (!isAnimateAtlas || atlas == null) return;
+
+		atlas.scale.set(scale.x, scale.y);
+		atlas.x = x + offset.x;
+		atlas.y = y + offset.y;
+
+		if (flipX) atlas.flipX = true;
+		#end
+	}
+
+
+	// =====================================================================
+	// DESTROY
+	// =====================================================================
+
+	override public function destroy():Void
+	{
+		#if flxanimate
+		atlas = FlxDestroyUtil.destroy(atlas);
+		#end
+
+		if (model != null) model.destroy();
+		model = null;
+
+		if (modelView != null) modelView.destroy();
+		modelView = null;
+
+		if (animSpeed != null) animSpeed.clear();
+		if (animRedirect != null) animRedirect.clear();
+
+		super.destroy();
+	}
+}
