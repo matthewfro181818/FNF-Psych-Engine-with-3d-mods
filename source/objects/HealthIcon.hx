@@ -6,7 +6,7 @@ import flixel.tweens.FlxEase;
 import flixel.tweens.FlxTween;
 import flixel.FlxSprite;
 import openfl.utils.Assets as OpenFlAssets;
-import Paths;
+import backend.Paths;
 
 class HealthIcon extends FlxSprite
 {
