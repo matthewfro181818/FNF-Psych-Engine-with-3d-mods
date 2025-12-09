@@ -655,9 +655,6 @@ class Character extends FlxNestedSkewSprite {
 	}
 }
 
-// antialiasing
-noAntialiasing = (json.no_antialiasing == true);
-antialiasing = ClientPrefs.data.antialiasing ? !noAntialiasing : false;
 function createAtlas() {
 	atlasActive = true;
 	atlasContainer = new AtlasThing();
@@ -1103,8 +1100,7 @@ function animationEnd(name:String) {
 						playAnim(theAnim, false, false, 6);
 				}
 		}
-	} catch (e:Dynamic)
-	{}
+	} catch (e:Dynamic) {}
 }
 
 function sortAnims(Obj1:Array<Dynamic>, Obj2:Array<Dynamic>):Int {
@@ -1116,7 +1112,7 @@ if (theAnim == 'dodge' || theAnim == 'hit' || theAnim == 'attack') {
 	canAutoIdle = true;
 	idleEnd();
 }
-} public var danceEveryNumBeats:Int = 2;
+public var danceEveryNumBeats:Int = 2;
 private var settingCharacterUp:Bool = true;
 
 public function recalculateDanceIdle() {
