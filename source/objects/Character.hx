@@ -656,7 +656,6 @@ class Character extends FlxNestedSkewSprite {
 }
 
 // antialiasing
-noAntialiasing = (json.no_antialiasing == true);
 antialiasing = ClientPrefs.data.antialiasing ? !noAntialiasing : false;
 function createAtlas() {
 	atlasActive = true;
