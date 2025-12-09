@@ -655,6 +655,9 @@ class Character extends FlxNestedSkewSprite {
 	}
 }
 
+// antialiasing
+noAntialiasing = (json.no_antialiasing == true);
+antialiasing = ClientPrefs.data.antialiasing ? !noAntialiasing : false;
 function createAtlas() {
 	atlasActive = true;
 	atlasContainer = new AtlasThing();
@@ -754,6 +757,7 @@ override function update(elapsed:Float) {
 		}
 
 	switch (curCharacter) switch (curCharacter) {
+
 		case 'pico-speaker':
 			if (animationNotes.length > 0 && Conductor.songPosition > animationNotes[0][0]) {
 				var noteData:Int = 1;
