@@ -757,7 +757,6 @@ override function update(elapsed:Float) {
 		}
 
 	switch (curCharacter) switch (curCharacter) {
-
 		case 'pico-speaker':
 			if (animationNotes.length > 0 && Conductor.songPosition > animationNotes[0][0]) {
 				var noteData:Int = 1;
