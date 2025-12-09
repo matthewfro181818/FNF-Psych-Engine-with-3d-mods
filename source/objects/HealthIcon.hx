@@ -57,6 +57,19 @@ class HealthIcon extends FlxSprite
 	}
 
 
+	public function changeIcon(char:String, ?allowGPU:Bool = true) {
+		// Character icons live in mods/<mod>/images/healthicons/<char>/
+		var folder = "images/healthicons/" + char;
+
+		var modPath = Paths.mods(folder + "/normal.png");
+		var sharedPath = Paths.getSharedPath(folder + "/normal.png");
+
+		if (FileSystem.exists(modPath) || OpenFlAssets.exists(sharedPath))
+			this.char = char;
+		else
+			this.char = "face";
+	}
+
 	// --------------------------------------------------------------
 	// ICON STATES
 	// --------------------------------------------------------------
@@ -104,5 +117,20 @@ class HealthIcon extends FlxSprite
 	{
 		tween = FlxDestroyUtil.destroy(tween);
 		super.destroy();
+	}
+
+	public var autoAdjustOffset:Bool = true;
+	override function updateHitbox()
+	{
+		super.updateHitbox();
+		if(autoAdjustOffset)
+		{
+			offset.x = iconOffsets[0];
+			offset.y = iconOffsets[1];
+		}
+	}
+
+	public function getCharacter():String {
+		return char;
 	}
 }
