@@ -5,6 +5,7 @@ import backend.StageData;
 import backend.WeekData;
 import backend.Song;
 import backend.Rating;
+import backend.model.ModelView;
 
 import flixel.FlxBasic;
 import flixel.FlxObject;
@@ -268,6 +269,8 @@ class PlayState extends MusicBeatState
 	public static var nextReloadAll:Bool = false;
 	override public function create()
 	{
+		modelView = new ModelView(camGame);
+
 		//trace('Playback Rate: ' + playbackRate);
 		_lastLoadedModDirectory = Mods.currentModDirectory;
 		Paths.clearStoredMemory();
@@ -1687,6 +1690,10 @@ class PlayState extends MusicBeatState
 		else FlxG.camera.followLerp = 0;
 		callOnScripts('onUpdate', [elapsed]);
 
+if (modelView != null)
+{
+    modelView.render();
+}
 		super.update(elapsed);
 
 		setOnScripts('curDecStep', curDecStep);
