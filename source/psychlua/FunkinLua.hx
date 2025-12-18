@@ -217,6 +217,15 @@ class FunkinLua {
 			return runningScripts;
 		});
 
+		Lua_helper.add_callback(lua, "setModel3DRotation", function(char:String, x:Float, y:Float, z:Float)
+{
+    var c = PlayState.instance.getCharacter(char);
+    if (c != null && c.is3D)
+    {
+        c.model3D.rotation.set(x,y,z);
+    }
+});
+
 		addLocalCallback("setOnScripts", function(varName:String, arg:Dynamic, ?ignoreSelf:Bool = false, ?exclusions:Array<String> = null) {
 			if(exclusions == null) exclusions = [];
 			if(ignoreSelf && !exclusions.contains(scriptName)) exclusions.push(scriptName);
