@@ -45,6 +45,8 @@ class Character extends FlxSprite
 {
 	public var model3D:Model3D;
 public var is3D:Bool = false;
+public var model:Model3D;
+public var animator:ModelAnimator;
 
 	/**
 	 * In case a character is missing, it will use this on its place
@@ -192,6 +194,12 @@ if (json.model != null)
 {
     is3D = true;
     model3D = ModelLoader.load(json.model.path);
+    animator = model.animator;
+}
+if (json.hybrid == true)
+{
+    sprite.visible = true;
+    model.visible = true;
 }
 
 		// positioning
@@ -389,6 +397,10 @@ if (json.model != null)
 
 	public function playAnim(AnimName:String, Force:Bool = false, Reversed:Bool = false, Frame:Int = 0):Void
 	{
+		
+        if (is3D && animator != null)
+            animator.play(anim);
+	
 		specialAnim = false;
 		if(!isAnimateAtlas)
 		{
