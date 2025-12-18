@@ -1,5 +1,8 @@
 package states.editors;
 
+import backend.model.ModelView;
+import backend.model.Model3D;
+
 import flixel.graphics.FlxGraphic;
 
 import flixel.system.debug.interaction.tools.Pointer.GraphicCursorCross;
@@ -19,6 +22,9 @@ import states.editors.content.PsychJsonPrinter;
 
 class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler.PsychUIEvent
 {
+	var modelView:ModelView;
+var previewModel:Model3D;
+
 	var character:Character;
 	var ghost:FlxSprite;
 	var animateGhost:FlxAnimate;
@@ -112,6 +118,8 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		cameraFollowPointer = new FlxSprite().loadGraphic(FlxGraphic.fromClass(GraphicCursorCross));
 		cameraFollowPointer.setGraphicSize(40, 40);
 		cameraFollowPointer.updateHitbox();
+
+		modelView = new ModelView(camEditor);
 
 		healthBar = new Bar(30, FlxG.height - 75);
 		healthBar.scrollFactor.set();
@@ -216,6 +224,38 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		helpTexts.active = helpTexts.visible = false;
 		add(helpTexts);
 	}
+var modelPathInput:PsychUIInputText;
+var modelScaleStepperX:PsychUINumericStepper;
+var modelScaleStepperY:PsychUINumericStepper;
+var modelScaleStepperZ:PsychUINumericStepper;
+
+function add3DModelUI()
+{
+    var tab = UI_characterbox.getTab('3D Model').menu;
+
+    modelPathInput = new PsychUIInputText(15, 30, 250, '', 8);
+
+    var loadModelBtn = new PsychUIButton(15, 60, "Load Model", function()
+    {
+        if (modelPathInput.text.length < 1) return;
+
+        character.load3DModel(modelPathInput.text);
+        unsavedProgress = true;
+    });
+
+    modelScaleStepperX = new PsychUINumericStepper(15, 110, 0.1, 1, 0.01, 50, 2);
+    modelScaleStepperY = new PsychUINumericStepper(95, 110, 0.1, 1, 0.01, 50, 2);
+    modelScaleStepperZ = new PsychUINumericStepper(175, 110, 0.1, 1, 0.01, 50, 2);
+
+    tab.add(new FlxText(15, 12, 200, "GLTF Model Path:"));
+    tab.add(modelPathInput);
+    tab.add(loadModelBtn);
+
+    tab.add(new FlxText(15, 92, 200, "Scale X / Y / Z"));
+    tab.add(modelScaleStepperX);
+    tab.add(modelScaleStepperY);
+    tab.add(modelScaleStepperZ);
+}
 
 	function addCharacter(reload:Bool = false)
 	{
@@ -251,7 +291,13 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		UI_box.scrollFactor.set();
 		UI_box.cameras = [camHUD];
 
-		UI_characterbox = new PsychUIBox(UI_box.x - 100, UI_box.y + UI_box.height + 10, 350, 280, ['Animations', 'Character']);
+		UI_characterbox = new PsychUIBox(
+    UI_box.x - 100,
+    UI_box.y + UI_box.height + 10,
+    350,
+    320,
+    ['Animations', 'Character', '3D Model']
+);
 		UI_characterbox.scrollFactor.set();
 		UI_characterbox.cameras = [camHUD];
 		add(UI_characterbox);
@@ -261,6 +307,7 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 		addSettingsUI();
 		addAnimationsUI();
 		addCharacterUI();
+		add3DModelUI();
 
 		UI_box.selectedName = 'Settings';
 		UI_characterbox.selectedName = 'Character';
@@ -728,6 +775,19 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 				unsavedProgress = true;
 			}
 		}
+		else if (id == PsychUINumericStepper.CHANGE_EVENT)
+{
+    if (character.is3D && character.model3D != null)
+    {
+        character.model3D.scale.set(
+            modelScaleStepperX.value,
+            modelScaleStepperY.value,
+            modelScaleStepperZ.value
+        );
+        unsavedProgress = true;
+    }
+}
+
 		else if(id == PsychUINumericStepper.CHANGE_EVENT)
 		{
 			if (sender == scaleStepper)
@@ -861,6 +921,16 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 	override function update(elapsed:Float)
 	{
 		super.update(elapsed);
+		
+if (character != null && character.is3D && character.model3D != null)
+{
+    character.model3D.update(elapsed);
+}
+
+		if (changedAnim && character.is3D && character.modelAnimator != null)
+{
+    character.modelAnimator.play(anims[curAnim].anim);
+}
 
 		if(PsychUIInputText.focusOn != null)
 		{
@@ -1299,6 +1369,30 @@ class CharacterEditorState extends MusicBeatState implements PsychUIEventHandler
 			"vocals_file": character.vocalsFile,
 			"_editor_isPlayer": character.isPlayer
 		};
+
+		if (character.is3D && character.model3D != null)
+{
+    json.model3D =
+    {
+        path: character.model3D.sourcePath,
+        scale: [
+            character.model3D.scale.x,
+            character.model3D.scale.y,
+            character.model3D.scale.z
+        ],
+        position: [
+            character.model3D.position.x,
+            character.model3D.position.y,
+            character.model3D.position.z
+        ],
+        rotation: [
+            character.model3D.rotation.x,
+            character.model3D.rotation.y,
+            character.model3D.rotation.z
+        ]
+    };
+}
+
 
 		var data:String = PsychJsonPrinter.print(json, ['offsets', 'position', 'healthbar_colors', 'camera_position', 'indices']);
 
