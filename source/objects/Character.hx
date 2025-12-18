@@ -1,6 +1,9 @@
 package objects;
 
 import backend.animation.PsychAnimationController;
+import backend.model.ModelView;
+import backend.model.Model3D;
+import backend.model.loaders.*;
 
 import flixel.util.FlxSort;
 import flixel.util.FlxDestroyUtil;
@@ -40,6 +43,9 @@ typedef AnimArray = {
 
 class Character extends FlxSprite
 {
+	public var model3D:Model3D;
+public var is3D:Bool = false;
+
 	/**
 	 * In case a character is missing, it will use this on its place
 	**/
@@ -181,6 +187,12 @@ class Character extends FlxSprite
 			scale.set(jsonScale, jsonScale);
 			updateHitbox();
 		}
+
+if (json.model != null)
+{
+    is3D = true;
+    model3D = ModelLoader.load(json.model.path);
+}
 
 		// positioning
 		positionArray = json.position;
